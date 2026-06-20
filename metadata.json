@@ -1,0 +1,10 @@
+{
+  "name": "RTTC Kampong Cham Attendance Portal",
+  "description": "An elegant student attendance and absence tracking solution for Class R01 at the Regional Teacher Training Center Kampong Cham (RTTC Kampong Cham), featuring QR check-ins, geofencing verification, admin rosters, and spreadsheet export tools.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_OPENAI_API"
+  ]
+}
