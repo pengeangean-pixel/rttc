@@ -2473,11 +2473,11 @@ export default function App() {
                 <div className="mt-4 pt-3.5 border-t border-amber-900/10 flex flex-col gap-2 font-mono text-[10px] text-amber-800">
                   <div className="flex gap-1.5 items-center">
                     <Phone className="w-3 h-3 text-amber-700/80" />
-                    <span>096 456 7123</span>
+                    <span>088 672 2609</span>
                   </div>
                   <div className="flex gap-1.5 items-center">
                     <Send className="w-3 h-3 text-amber-700/80" />
-                    <span>Telegram username: @Pengeang_Ean</span>
+                    <span>Telegram username: @pengeangean</span>
                   </div>
                 </div>
               </div>
