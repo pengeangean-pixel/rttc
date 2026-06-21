@@ -1,5 +1,3 @@
-import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
-import { db } from "./firebase";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -147,7 +145,20 @@ export default function App() {
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
     const saved = localStorage.getItem("rttc_attendance_r01");
-    return saved ? JSON.parse(saved) : [];
+    if (saved) return JSON.parse(saved);
+    
+    // Default attendance for today
+    const today = new Date().toISOString().split('T')[0];
+    return initialStudentsList.map((st, index) => ({
+      id: `${st.id}-${today}`,
+      studentId: st.id,
+      date: today,
+      status: index % 6 === 0 ? "Absent_Permission" : index % 11 === 0 ? "Absent_No_Permission" : "Present",
+      checkInTime: index % 6 !== 0 && index % 11 !== 0 ? "07:15 AM" : undefined,
+      verifiedByQR: index % 4 === 0,
+      latitude: 11.9934,
+      longitude: 105.4645
+    }));
   });
 
   // Current session config
@@ -197,62 +208,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("rttc_attendance_r01", JSON.stringify(attendance));
   }, [attendance]);
-
-  // Firestore realtime sync: every device gets updates immediately.
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, "students"),
-      (snapshot) => {
-        const remoteStudents = snapshot.docs.map((snap) => ({
-          id: snap.id,
-          ...(snap.data() as Omit<Student, "id">)
-        }));
-        if (remoteStudents.length > 0) {
-          setStudents(remoteStudents);
-        }
-      },
-      (error) => console.error("Firestore students sync error:", error)
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, "attendance"),
-      (snapshot) => {
-        const remoteAttendance = snapshot.docs.map((snap) => ({
-          id: snap.id,
-          ...(snap.data() as Omit<AttendanceRecord, "id">)
-        }));
-        setAttendance(remoteAttendance);
-      },
-      (error) => console.error("Firestore attendance sync error:", error)
-    );
-
-    return () => unsubscribe();
-  }, []);
-
-  const upsertLocalAttendance = (record: AttendanceRecord) => {
-    setAttendance((current) => {
-      const updated = [...current];
-      const idx = updated.findIndex((r) => r.id === record.id);
-      if (idx >= 0) {
-        updated[idx] = record;
-      } else {
-        updated.push(record);
-      }
-      return updated;
-    });
-  };
-
-  const saveAttendanceRecord = async (record: AttendanceRecord) => {
-    upsertLocalAttendance(record);
-    await setDoc(doc(db, "attendance", record.id), {
-      ...record,
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-  };
 
   // Dynamic Real QR Code generation with error handling
   useEffect(() => {
@@ -455,7 +410,7 @@ export default function App() {
     reader.readAsText(file, "UTF-8");
   };
 
-  const handleConfirmBulkImport = async () => {
+  const handleConfirmBulkImport = () => {
     if (parsedBulkStudents.length === 0) return;
 
     // Merge students list. If ID already exists, overwrite. Otherwise add.
@@ -470,13 +425,6 @@ export default function App() {
     });
 
     setStudents(merged);
-
-    const batch = writeBatch(db);
-    merged.forEach((student) => {
-      batch.set(doc(db, "students", student.id), student, { merge: true });
-    });
-    await batch.commit();
-
     setShowBulkImportModal(false);
     setParsedBulkStudents([]);
     setBulkImportError("");
@@ -597,7 +545,7 @@ export default function App() {
   };
 
   // Quick State Toggler (Present/Absent-Permission/Absent-No-Permission)
-  const toggleAttendanceStatus = async (studentId: string, currentStatus: AttendanceStatus) => {
+  const toggleAttendanceStatus = (studentId: string, currentStatus: AttendanceStatus) => {
     const todayStr = selectedDate;
     const recordId = `${studentId}-${todayStr}`;
     
@@ -614,43 +562,58 @@ export default function App() {
       updatedTime = "07:45 AM";
     }
 
-    const existingRecord = attendance.find(r => r.id === recordId);
-    const record: AttendanceRecord = {
-      ...(existingRecord || { id: recordId, studentId, date: todayStr, verifiedByQR: false }),
-      status: nextStatus,
-      checkInTime: updatedTime
-    };
+    const existingIndex = attendance.findIndex(r => r.id === recordId);
+    let updatedAttendance = [...attendance];
 
-    await saveAttendanceRecord(record);
+    if (existingIndex >= 0) {
+      updatedAttendance[existingIndex] = {
+        ...updatedAttendance[existingIndex],
+        status: nextStatus,
+        checkInTime: updatedTime
+      };
+    } else {
+      updatedAttendance.push({
+        id: recordId,
+        studentId,
+        date: todayStr,
+        status: nextStatus,
+        checkInTime: updatedTime,
+        verifiedByQR: false
+      });
+    }
+
+    setAttendance(updatedAttendance);
     triggerToast(lang === "km" ? "វត្តមានត្រូវបានផ្លាស់ប្ដូរ" : "Attendance status flipped");
   };
 
   // Bulk set all to Present
-  const setAllToPresent = async () => {
+  const setAllToPresent = () => {
     const todayStr = selectedDate;
     const updated = [...attendance];
-    const batch = writeBatch(db);
-
+    
     students.forEach(st => {
       const recordId = `${st.id}-${todayStr}`;
       const existingIdx = updated.findIndex(r => r.id === recordId);
-      const record: AttendanceRecord = {
-        ...(existingIdx >= 0 ? updated[existingIdx] : { id: recordId, studentId: st.id, date: todayStr, verifiedByQR: false }),
-        status: "Present",
-        checkInTime: "07:15 AM"
-      };
-
+      
       if (existingIdx >= 0) {
-        updated[existingIdx] = record;
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          status: "Present",
+          checkInTime: "07:15 AM"
+        };
       } else {
-        updated.push(record);
+        updated.push({
+          id: recordId,
+          studentId: st.id,
+          date: todayStr,
+          status: "Present",
+          checkInTime: "07:15 AM",
+          verifiedByQR: false
+        });
       }
-
-      batch.set(doc(db, "attendance", recordId), { ...record, updatedAt: serverTimestamp() }, { merge: true });
     });
 
     setAttendance(updated);
-    await batch.commit();
     triggerToast(lang === "km" ? "និស្សិតទាំងអស់ត្រូវបានកត់ត្រា មានវត្តមាន" : "All students marked Present");
   };
 
@@ -661,7 +624,7 @@ export default function App() {
       const record = attendance.find(r => r.studentId === st.id && r.date === todayStr);
       return {
         ...st,
-        status: record ? record.status : ("Absent_No_Permission" as AttendanceStatus),
+        status: record ? record.status : ("Present" as AttendanceStatus),
         checkInTime: record ? record.checkInTime : undefined,
         verifiedByQR: record ? !!record.verifiedByQR : false
       };
@@ -687,7 +650,7 @@ export default function App() {
   const attendanceRate = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
 
   // Student Simulation QR Check-In Event
-  const executeSimulatedCheckIn = async () => {
+  const executeSimulatedCheckIn = () => {
     if (!simulatedStudentId) {
       setSimScanResult({ success: false, message: lang === "km" ? "សូមជ្រើសរើសឈ្មោះនិស្សិត" : "Please select a student" });
       return;
@@ -753,7 +716,13 @@ export default function App() {
       longitude: studentLng
     };
 
-    await saveAttendanceRecord(newRecord);
+    if (existingIndex >= 0) {
+      updated[existingIndex] = newRecord;
+    } else {
+      updated.push(newRecord);
+    }
+
+    setAttendance(updated);
     setSimScanResult({ 
       success: true, 
       message: lang === "km" 
@@ -811,7 +780,7 @@ export default function App() {
   };
 
   // Handle direct check-in of student from the QR Code scan landing page
-  const handleStudentDirectCheckIn = async (isSimulatedOverride: boolean) => {
+  const handleStudentDirectCheckIn = (isSimulatedOverride: boolean) => {
     if (!studentCheckInId) {
       triggerToast(lang === "km" ? "សូមជ្រើសរើសឈ្មោះរបស់អ្នកជាមុនសិន!" : "Please select your name first!");
       return;
@@ -829,6 +798,9 @@ export default function App() {
     const displayHours = (nowHours % 12 || 12).toString().padStart(2, "0");
     const formattedCheckInTime = `${displayHours}:${nowMins} ${ampm}`;
 
+    const updated = [...attendance];
+    const existingIndex = updated.findIndex(r => r.id === recordId);
+
     const checkInRecord: AttendanceRecord = {
       id: recordId,
       studentId: studentCheckInId,
@@ -836,11 +808,17 @@ export default function App() {
       status: "Present",
       checkInTime: formattedCheckInTime,
       verifiedByQR: true,
-      latitude: studentGPSData?.lat || geofence.latitude,
-      longitude: studentGPSData?.lng || geofence.longitude
+      latitude: isSimulatedOverride ? geofence.latitude : (studentGPSData?.lat || geofence.latitude),
+      longitude: isSimulatedOverride ? geofence.longitude : (studentGPSData?.lng || geofence.longitude)
     };
 
-    await saveAttendanceRecord(checkInRecord);
+    if (existingIndex >= 0) {
+      updated[existingIndex] = checkInRecord;
+    } else {
+      updated.push(checkInRecord);
+    }
+
+    setAttendance(updated);
     setCheckInSuccessDetails({
       studentName: selectedSt.name,
       time: formattedCheckInTime,
@@ -1148,13 +1126,11 @@ export default function App() {
       return;
     }
 
-    const executeSave = async () => {
+    const executeSave = () => {
       if (editingStudentId) {
         // Edit mode
-        const updatedStudent: Student = { id: editingStudentId, ...studentForm };
-        const updated = students.map(s => s.id === editingStudentId ? updatedStudent : s);
+        const updated = students.map(s => s.id === editingStudentId ? { ...s, ...studentForm } : s);
         setStudents(updated);
-        await setDoc(doc(db, "students", editingStudentId), updatedStudent, { merge: true });
         setEditingStudentId(null);
         triggerToast(t.toastSaved);
       } else {
@@ -1164,7 +1140,6 @@ export default function App() {
           ...studentForm
         };
         setStudents([...students, newStudent]);
-        await setDoc(doc(db, "students", newStudent.id), newStudent, { merge: true });
         triggerToast(t.toastSaved);
       }
 
@@ -1191,13 +1166,13 @@ export default function App() {
         type: "edit",
         actionLabel: lang === "km" ? "យល់ព្រមរក្សាទុក" : "Save Changes",
         cancelLabel: lang === "km" ? "បោះបង់" : "Cancel",
-        onConfirm: async () => {
-          await executeSave();
+        onConfirm: () => {
+          executeSave();
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
       });
     } else {
-      void executeSave();
+      executeSave();
     }
   };
 
@@ -1228,9 +1203,8 @@ export default function App() {
       type: "delete",
       actionLabel: lang === "km" ? "យល់ព្រមលុប" : "Confirm Delete",
       cancelLabel: lang === "km" ? "បោះបង់" : "Cancel",
-      onConfirm: async () => {
+      onConfirm: () => {
         setStudents(prev => prev.filter(s => s.id !== id));
-        await deleteDoc(doc(db, "students", id));
         triggerToast(t.toastDeleted);
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -2436,7 +2410,7 @@ export default function App() {
                     <span className="text-slate-400">Campus Longitude:</span>
                     <strong className="text-slate-900">{geofence.longitude}° E</strong>
                   </div>
-                  <div className="flex justify-between border-t border-slate-205/50 pt-2.5 mt-1">
+                  <div className="flex justify-between border-t border-slate-202 pt-2.5 mt-1">
                     <span className="text-slate-400">Radius Config:</span>
                     <strong className="text-emerald-700">{geofence.radius}m ({lang === "km" ? "អនុញ្ញាត" : "Allowed"})</strong>
                   </div>
@@ -2473,11 +2447,11 @@ export default function App() {
                 <div className="mt-4 pt-3.5 border-t border-amber-900/10 flex flex-col gap-2 font-mono text-[10px] text-amber-800">
                   <div className="flex gap-1.5 items-center">
                     <Phone className="w-3 h-3 text-amber-700/80" />
-                    <span>088 672 2609</span>
+                    <span>096 456 7123</span>
                   </div>
                   <div className="flex gap-1.5 items-center">
                     <Send className="w-3 h-3 text-amber-700/80" />
-                    <span>Telegram username: @pengeangean</span>
+                    <span>Telegram username: @Pengeang_Ean</span>
                   </div>
                 </div>
               </div>
@@ -2501,179 +2475,209 @@ export default function App() {
                 </p>
               </div>
 
-              {!showAddForm && (
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <button
-                    onClick={() => {
-                      setEditingStudentId(null);
-                      setStudentForm({
-                        name: "",
-                        gender: "ប្រុស",
-                        dob: "2004-01-01",
-                        address: "",
-                        phoneNumber: "",
-                        telegram: "",
-                        isMonitor: false
-                      });
-                      setShowAddForm(true);
-                    }}
-                    className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all"
-                    id="btn-add-student-init"
-                  >
-                    <Plus className="w-4 h-4 text-emerald-400" />
-                    {t.addNewStudent}
-                  </button>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  onClick={() => {
+                    setEditingStudentId(null);
+                    setStudentForm({
+                      name: "",
+                      gender: "ប្រុស",
+                      dob: "2004-01-01",
+                      address: "",
+                      phoneNumber: "",
+                      telegram: "",
+                      isMonitor: false
+                    });
+                    setShowAddForm(true);
+                  }}
+                  className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all hover:scale-[1.02] active:scale-95"
+                  id="btn-add-student-init"
+                >
+                  <Plus className="w-4 h-4 text-emerald-400" />
+                  {t.addNewStudent}
+                </button>
 
-                  <button
-                    onClick={() => setShowBulkImportModal(true)}
-                    className="px-5 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all"
-                    id="btn-bulk-import-init"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 animate-pulse" />
-                    {t.importBulkBtn || "នាំចូលនិស្សិតច្រើន (CSV)"}
-                  </button>
-                </div>
-              )}
+                <button
+                  onClick={() => setShowBulkImportModal(true)}
+                  className="px-5 py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all hover:scale-[1.02] active:scale-95"
+                  id="btn-bulk-import-init"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-600 animate-pulse" />
+                  {t.importBulkBtn || "នាំចូលនិស្សិតច្រើន (CSV)"}
+                </button>
+              </div>
             </div>
 
-            {/* Dynamic Add/Edit Form */}
-            {showAddForm && (
-              <form onSubmit={handleSaveStudent} className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4 max-w-2xl">
-                <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
-                  <h3 className="font-bold text-sm sm:text-base text-slate-900 flex items-center gap-1.5">
-                    <UserPlus className="w-5 h-5 text-emerald-600" />
-                    {editingStudentId ? t.editStudent : t.addNewStudent}
-                  </h3>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowAddForm(false)}
-                    className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-150"
+            {/* Beautiful, Animated Student Add/Edit Modal with trendy gradient backdrop */}
+            <AnimatePresence>
+              {showAddForm && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-gradient-to-tr from-[#0b0f19]/90 via-[#111827]/85 to-[#064e4b]/40 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+                >
+                  <motion.div
+                    initial={{ scale: 0.95, y: 30, opacity: 0 }}
+                    animate={{ scale: 1, y: 0, opacity: 1 }}
+                    exit={{ scale: 0.95, y: 30, opacity: 0 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 220 }}
+                    className="bg-white rounded-3xl border border-slate-100 max-w-2xl w-full p-6 shadow-2xl relative space-y-5 my-8 font-sans overflow-hidden"
                   >
-                    <X className="w-4.5 h-4.5" />
-                  </button>
-                </div>
+                    {/* Top gradient highlight strip */}
+                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-550" />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  
-                  <div>
-                    <label htmlFor="form-name" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                      {t.fullName} *
-                    </label>
-                    <input 
-                      id="form-name"
-                      type="text"
-                      required
-                      placeholder={lang === "km" ? "ឧ. សុខ មករា" : "e.g., Sok Makara"}
-                      value={studentForm.name}
-                      onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 transition-all font-sans"
-                    />
-                  </div>
+                    <div className="flex items-center justify-between border-b border-slate-150 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl ring-4 ring-emerald-50/50">
+                          <UserPlus className="w-6 h-6 animate-pulse" />
+                        </div>
+                        <div>
+                          <h3 className="font-extrabold text-base sm:text-lg text-slate-900 leading-snug">
+                            {editingStudentId ? t.editStudent : t.addNewStudent}
+                          </h3>
+                          <p className="text-[11px] text-slate-400">
+                            {editingStudentId 
+                              ? (lang === "km" ? "ធ្វើបច្ចុប្បន្នភាពព័ត៌មានលម្អិតរបស់និស្សិតខាងក្រោម" : "Update the detailed student info below to persist changes.")
+                              : (lang === "km" ? "បំពេញព័ត៌មានលម្អិតដើម្បីបង្កើតគណនីនិស្សិតថ្មី" : "Fill relevant details to establish a new student record.")}
+                          </p>
+                        </div>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowAddForm(false)}
+                        className="p-2 text-slate-400 hover:text-slate-650 rounded-xl hover:bg-slate-100 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
 
-                  <div>
-                    <label htmlFor="form-gender" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                      {t.gender}
-                    </label>
-                    <select
-                      id="form-gender"
-                      value={studentForm.gender}
-                      onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value as "ប្រុស" | "ស្រី" })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-555 transition-all"
-                    >
-                      <option value="ប្រុស">{lang === "km" ? "ប្រុស (Male)" : "Male"}</option>
-                      <option value="ស្រី">{lang === "km" ? "ស្រី (Female)" : "Female"}</option>
-                    </select>
-                  </div>
+                    <form onSubmit={handleSaveStudent} className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        
+                        <div>
+                          <label htmlFor="form-name" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                            {t.fullName} *
+                          </label>
+                          <input 
+                            id="form-name"
+                            type="text"
+                            required
+                            placeholder={lang === "km" ? "ឧ. សុខ មករា" : "e.g., Sok Makara"}
+                            value={studentForm.name}
+                            onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                        </div>
 
-                  <div>
-                    <label htmlFor="form-dob" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                      {t.dob}
-                    </label>
-                    <input 
-                      id="form-dob"
-                      type="date"
-                      value={studentForm.dob}
-                      onChange={(e) => setStudentForm({ ...studentForm, dob: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 transition-all font-sans"
-                    />
-                  </div>
+                        <div>
+                          <label htmlFor="form-gender" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                            {t.gender}
+                          </label>
+                          <select
+                            id="form-gender"
+                            value={studentForm.gender}
+                            onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value as "ប្រុស" | "ស្រី" })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all"
+                          >
+                            <option value="ប្រុស">{lang === "km" ? "ប្រុស (Male)" : "Male"}</option>
+                            <option value="ស្រី">{lang === "km" ? "ស្រី (Female)" : "Female"}</option>
+                          </select>
+                        </div>
 
-                  <div>
-                    <label htmlFor="form-phone" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                      {t.phoneNum} *
-                    </label>
-                    <input 
-                      id="form-phone"
-                      type="text"
-                      required
-                      placeholder="e.g., 096 1122334"
-                      value={studentForm.phoneNumber}
-                      onChange={(e) => setStudentForm({ ...studentForm, phoneNumber: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 transition-all font-sans"
-                    />
-                  </div>
+                        <div>
+                          <label htmlFor="form-dob" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                            {t.dob}
+                          </label>
+                          <input 
+                            id="form-dob"
+                            type="date"
+                            value={studentForm.dob}
+                            onChange={(e) => setStudentForm({ ...studentForm, dob: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                        </div>
 
-                  <div>
-                    <label htmlFor="form-tg" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                      {t.tgUsername}
-                    </label>
-                    <input 
-                      id="form-tg"
-                      type="text"
-                      placeholder="e.g., @m_sopheak"
-                      value={studentForm.telegram}
-                      onChange={(e) => setStudentForm({ ...studentForm, telegram: e.target.value })}
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 transition-all font-sans"
-                    />
-                  </div>
+                        <div>
+                          <label htmlFor="form-phone" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                            {t.phoneNum} *
+                          </label>
+                          <input 
+                            id="form-phone"
+                            type="text"
+                            required
+                            placeholder="e.g., 096 1122334"
+                            value={studentForm.phoneNumber}
+                            onChange={(e) => setStudentForm({ ...studentForm, phoneNumber: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                        </div>
 
-                  <div className="flex items-center gap-2 pt-6">
-                    <input 
-                      type="checkbox"
-                      id="form-monitor"
-                      checked={studentForm.isMonitor}
-                      onChange={(e) => setStudentForm({ ...studentForm, isMonitor: e.target.checked })}
-                      className="h-4.5 w-4.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <label htmlFor="form-monitor" className="text-xs font-bold text-slate-700 cursor-pointer uppercase select-none">
-                      {lang === "km" ? "ជាប្រធានថ្នាក់ (Class Monitor)" : "Is Monitor"}
-                    </label>
-                  </div>
+                        <div>
+                          <label htmlFor="form-tg" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                            {t.tgUsername}
+                          </label>
+                          <input 
+                            id="form-tg"
+                            type="text"
+                            placeholder="e.g., @m_sopheak"
+                            value={studentForm.telegram}
+                            onChange={(e) => setStudentForm({ ...studentForm, telegram: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                        </div>
 
-                </div>
+                        <div className="flex items-center gap-2 pt-6">
+                          <input 
+                            type="checkbox"
+                            id="form-monitor"
+                            checked={studentForm.isMonitor}
+                            onChange={(e) => setStudentForm({ ...studentForm, isMonitor: e.target.checked })}
+                            className="h-4.5 w-4.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <label htmlFor="form-monitor" className="text-xs font-bold text-slate-705 cursor-pointer uppercase select-none">
+                            {lang === "km" ? "ជាប្រធានថ្នាក់ (Class Monitor)" : "Is Monitor"}
+                          </label>
+                        </div>
 
-                <div>
-                  <label htmlFor="form-addr" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                    {t.currentAddress} *
-                  </label>
-                  <textarea 
-                    id="form-addr"
-                    rows={2}
-                    required
-                    placeholder={lang === "km" ? "ឧ. ភូមិវាល ឃុំព្រៃឈរ ស្រុកព្រៃឈរ ខេត្តកំពង់ចាម" : "e.g., Veal village, Kampong Cham province"}
-                    value={studentForm.address}
-                    onChange={(e) => setStudentForm({ ...studentForm, address: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 transition-all font-sans resize-none"
-                  />
-                </div>
+                      </div>
 
-                <div className="flex justify-end gap-3 pt-3 border-t border-slate-200/50">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddForm(false)}
-                    className="px-4 py-2 border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-bold rounded-xl transition-all"
-                  >
-                    {t.cancel}
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white hover:from-emerald-750 hover:to-emerald-800 text-xs font-bold rounded-xl transition-all shadow-md"
-                  >
-                    {t.saveProfile}
-                  </button>
-                </div>
-              </form>
-            )}
+                      <div>
+                        <label htmlFor="form-addr" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                          {t.currentAddress} *
+                        </label>
+                        <textarea 
+                          id="form-addr"
+                          rows={2}
+                          required
+                          placeholder={lang === "km" ? "ឧ. ភូមិវាល ឃុំព្រៃឈរ ស្រុកព្រៃឈរ ខេត្តកំពង់ចាម" : "e.g., Veal village, Kampong Cham province"}
+                          value={studentForm.address}
+                          onChange={(e) => setStudentForm({ ...studentForm, address: e.target.value })}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans resize-none"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-4 border-t border-slate-150">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddForm(false)}
+                          className="px-4 py-2.5 border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-bold rounded-xl transition-all hover:scale-[1.02] active:scale-95"
+                        >
+                          {t.cancel}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white hover:from-emerald-550 hover:to-emerald-600 text-xs font-bold rounded-xl transition-all shadow-md hover:scale-[1.02] active:scale-95 flex items-center gap-1.5"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          {t.saveProfile}
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Student list grid with editable properties */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="roster-grid">
@@ -3120,7 +3124,7 @@ export default function App() {
                       <td className="px-4 py-2.5 border-r border-slate-200 text-center font-bold">
                         <select
                           value={st.status}
-                          onChange={async (e) => {
+                          onChange={(e) => {
                             // Update attendance records from Excel spreadsheet selector cell
                             const targetVal = e.target.value as AttendanceStatus;
                             const todayStr = selectedDate;
@@ -3147,10 +3151,7 @@ export default function App() {
                                 verifiedByQR: false
                               });
                             }
-                            const recordToSave = updated.find(r => r.id === recordId);
-                            if (recordToSave) {
-                              await saveAttendanceRecord(recordToSave);
-                            }
+                            setAttendance(updated);
                             triggerToast(lang === "km" ? "វត្តមានត្រូវបានកែសម្រួលលើតារាង" : "Spreadsheet cell updated!");
                           }}
                           className={`text-[10px] font-bold py-1 px-2.5 rounded-lg border focus:outline-none cursor-pointer ${
