@@ -156,8 +156,8 @@ export default function App() {
       status: index % 6 === 0 ? "Absent_Permission" : index % 11 === 0 ? "Absent_No_Permission" : "Present",
       checkInTime: index % 6 !== 0 && index % 11 !== 0 ? "07:15 AM" : undefined,
       verifiedByQR: index % 4 === 0,
-      latitude: 11.9934,
-      longitude: 105.4645
+      latitude: 12.0004658,
+      longitude: 105.4404141
     }));
   });
 
