@@ -68,6 +68,12 @@ import { translations } from "./translations_rttc";
 import { initialStudentsList } from "./studentsData";
 import QRCode from "qrcode";
 
+const removeUndefinedFields = <T extends object>(data: T) => {
+  return Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
+};
+
 export default function App() {
   // Locale state
   const [lang, setLang] = useState<"km" | "en">("km");
@@ -443,7 +449,7 @@ export default function App() {
     try {
       const batch = writeBatch(db);
       parsedBulkStudents.forEach(st => {
-        batch.set(doc(db, "students", st.id), st);
+        batch.set(doc(db, "students", st.id), removeUndefinedFields(st));
       });
       await batch.commit();
       setStudents(merged);
@@ -596,13 +602,13 @@ export default function App() {
     }
 
     try {
-      await setDoc(doc(db, "attendance", recordId), {
+      await setDoc(doc(db, "attendance", recordId), removeUndefinedFields({
         studentId,
         date: todayStr,
         status: nextStatus,
         checkInTime: updatedTime,
         verifiedByQR: false
-      });
+      }));
       triggerToast(lang === "km" ? "វត្តមានត្រូវបានកែប្រែលើ Cloud រួចរាល់" : "Attendance updated on Cloud");
     } catch (error) {
       console.error("Error toggling attendance on Cloud:", error);
@@ -618,13 +624,13 @@ export default function App() {
       students.forEach(st => {
         const recordId = `${st.id}-${todayStr}`;
         const recordRef = doc(db, "attendance", recordId);
-        batch.set(recordRef, {
+        batch.set(recordRef, removeUndefinedFields({
           studentId: st.id,
           date: todayStr,
           status: "Present",
           checkInTime: "07:15 AM",
           verifiedByQR: false
-        });
+        }));
       });
       await batch.commit();
       triggerToast(lang === "km" ? "និស្សិតទាំងអស់ត្រូវបានកត់ត្រា មានវត្តមានលើ Cloud" : "All students marked Present on Cloud");
@@ -835,7 +841,7 @@ export default function App() {
     }
 
     try {
-      await setDoc(doc(db, "attendance", recordId), checkInRecord);
+      await setDoc(doc(db, "attendance", recordId), removeUndefinedFields(checkInRecord));
       setAttendance(updated);
       setCheckInSuccessDetails({
         studentName: selectedSt.name,
@@ -1153,7 +1159,7 @@ export default function App() {
         if (editingStudentId) {
           // Edit mode
           const updatedStudent: Student = { id: editingStudentId, ...studentForm };
-          await setDoc(doc(db, "students", editingStudentId), updatedStudent);
+          await setDoc(doc(db, "students", editingStudentId), removeUndefinedFields(updatedStudent));
           const updated = students.map(s => s.id === editingStudentId ? updatedStudent : s);
           setStudents(updated);
           setEditingStudentId(null);
@@ -1164,7 +1170,7 @@ export default function App() {
             id: `s-${Date.now()}`,
             ...studentForm
           };
-          await setDoc(doc(db, "students", newStudent.id), newStudent);
+          await setDoc(doc(db, "students", newStudent.id), removeUndefinedFields(newStudent));
           setStudents([...students, newStudent]);
           triggerToast(t.toastSaved);
         }
@@ -3012,7 +3018,7 @@ export default function App() {
                             const updated = [...attendance];
                             const idxRecord = updated.findIndex(r => r.id === recordId);
                             
-                            const nowTime = targetVal === "Present" ? "07:15 AM" : undefined;
+                            const nowTime = targetVal === "Present" ? "07:15 AM" : "";
                             
                             if (idxRecord >= 0) {
                               updated[idxRecord] = {
