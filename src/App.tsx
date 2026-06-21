@@ -1,4 +1,4 @@
-import { db } from "./firebase";
+import { auth, db } from "./firebase";
 import { 
   collection, 
   onSnapshot, 
@@ -9,6 +9,18 @@ import {
   writeBatch 
 } from "firebase/firestore";
 import React, { useState, useEffect } from "react";
+import {
+  EmailAuthProvider,
+  User as FirebaseUser,
+  onAuthStateChanged,
+  reauthenticateWithCredential,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  updateEmail,
+  updatePassword,
+  updateProfile
+} from "firebase/auth";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Sparkles, 
@@ -102,29 +114,11 @@ export default function App() {
   const [checkInSuccessDetails, setCheckInSuccessDetails] = useState<{ studentName: string; time: string; date: string } | null>(null);
 
   // --- ATTENDANCE SYSTEM AUTHENTICATION STATES ---
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem("rttc_auth_active") === "true";
-  });
-  
-  const [adminPassword, setAdminPassword] = useState<string>(() => {
-    const saved = localStorage.getItem("rttc_admin_pwd");
-    return saved || "@rttc2026";
-  });
-
-  const [adminUsername, setAdminUsername] = useState<string>(() => {
-    const saved = localStorage.getItem("rttc_admin_username");
-    return saved || "admin";
-  });
-
-  const [adminEmail, setAdminEmail] = useState<string>(() => {
-    const saved = localStorage.getItem("rttc_admin_email");
-    return saved || "admin.rttc.kc@gmail.com";
-  });
-
-  const [adminDisplayName, setAdminDisplayName] = useState<string>(() => {
-    const saved = localStorage.getItem("rttc_admin_name");
-    return saved || "គណៈគ្រប់គ្រង RTTC";
-  });
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const isAuthenticated = Boolean(firebaseUser);
+  const adminEmail = firebaseUser?.email || "";
+  const adminDisplayName = firebaseUser?.displayName || (lang === "km" ? "គណៈគ្រប់គ្រង RTTC" : "RTTC Administrator");
 
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileUsername, setProfileUsername] = useState("");
@@ -143,9 +137,6 @@ export default function App() {
   const [resetNewPassword, setResetNewPassword] = useState("");
   const [resetConfirmPassword, setResetConfirmPassword] = useState("");
   const [resetError, setResetError] = useState("");
-
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleUserEmail, setGoogleUserEmail] = useState("");
 
   // Core state collections linked to Firebase
   const [students, setStudents] = useState<Student[]>([]);
@@ -190,6 +181,16 @@ export default function App() {
 
   // Toast feedback state
   const [toast, setToast] = useState<string | null>(null);
+
+  // Keep React state synced with Firebase Authentication.
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setIsAuthLoading(false);
+    });
+
+  return () => unsubscribeAuth();
+  }, []);
 
  // --- Real-time Cloud Sync Effect (Firestore onSnapshot) ---
   useEffect(() => {
@@ -466,25 +467,37 @@ export default function App() {
     }, 4500);
   };
 
-  const handleAdminSignIn = (e: React.FormEvent) => {
+  const getFirebaseAuthErrorMessage = (error: unknown) => {
+    const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: string }).code) : "";
+    if (code.includes("auth/invalid-email")) return lang === "km" ? "អ៊ីមែលមិនត្រឹមត្រូវ។" : "Invalid email address.";
+    if (code.includes("auth/user-not-found") || code.includes("auth/wrong-password") || code.includes("auth/invalid-credential")) return t.wrongCreds || "Incorrect email or password.";
+    if (code.includes("auth/too-many-requests")) return lang === "km" ? "ព្យាយាមចូលច្រើនដងពេក។ សូមព្យាយាមម្តងទៀតពេលក្រោយ។" : "Too many login attempts. Please try again later.";
+    if (code.includes("auth/requires-recent-login")) return lang === "km" ? "សូមចេញ ហើយចូលវិញម្តងទៀត មុនពេលកែប្រែព័ត៌មានសំខាន់។" : "Please sign out and sign in again before changing sensitive account information.";
+    if (code.includes("auth/weak-password")) return lang === "km" ? "លេខសម្ងាត់ត្រូវមានយ៉ាងហោចណាស់ 6 តួអក្សរ។" : "Password should be at least 6 characters.";
+    if (code.includes("auth/email-already-in-use")) return lang === "km" ? "អ៊ីមែលនេះត្រូវបានប្រើរួចហើយ។" : "This email is already in use.";
+    return lang === "km" ? "មានបញ្ហាជាមួយ Firebase Authentication។" : "Firebase Authentication error.";
+  };
+
+  const handleAdminSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputUsername.trim().toLowerCase() === adminUsername.trim().toLowerCase() && inputPassword === adminPassword) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem("rttc_auth_active", "true");
-      setWrongCredsError("");
+    setWrongCredsError("");
+    try {
+      await signInWithEmailAndPassword(auth, inputUsername.trim(), inputPassword);
       setInputUsername("");
       setInputPassword("");
       triggerToast(lang === "km" ? "ស្វាគមន៍មកកាន់ប្រព័ន្ធគ្រប់គ្រងសន្លឹកវត្តមាន RTTC!" : "Welcome to the RTTC Attendance management system!");
-    } else {
-      setWrongCredsError(t.wrongCreds || "Incorrect credentials");
-      triggerToast(t.wrongCreds || "Incorrect credentials");
+    } catch (error) {
+      const message = getFirebaseAuthErrorMessage(error);
+      setWrongCredsError(message);
+      triggerToast(message);
     }
   };
 
   const openProfileModal = () => {
-    setProfileUsername(adminUsername);
-    setProfileDisplayName(adminDisplayName);
-    setProfileEmail(adminEmail);
+    if (!firebaseUser) return;
+    setProfileUsername(firebaseUser.email || "");
+    setProfileDisplayName(firebaseUser.displayName || "");
+    setProfileEmail(firebaseUser.email || "");
     setProfileCurrentPassword("");
     setProfileNewPassword("");
     setProfileConfirmNewPassword("");
@@ -492,80 +505,75 @@ export default function App() {
     setShowProfileModal(true);
   };
 
-  const handleUpdateProfileSubmit = (e: React.FormEvent) => {
+  const handleUpdateProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profileUsername.trim()) {
-      setProfileError(t.usernameRequired || "Username is required.");
+    if (!firebaseUser || !firebaseUser.email) {
+      setProfileError(lang === "km" ? "មិនទាន់មានគណនី Firebase ចូលប្រព័ន្ធ។" : "No Firebase user is signed in.");
       return;
     }
-    
+    if (!profileEmail.trim()) {
+      setProfileError(lang === "km" ? "ត្រូវបញ្ចូលអ៊ីមែល។" : "Email is required.");
+      return;
+    }
+
+    const wantsEmailChange = profileEmail.trim() !== firebaseUser.email;
     const wantsPasswordChange = profileNewPassword.length > 0 || profileCurrentPassword.length > 0;
-    if (wantsPasswordChange) {
-      if (profileCurrentPassword !== adminPassword) {
-        setProfileError(t.currentPasswordInvalid || "Current password incorrect.");
-        return;
-      }
-      if (!profileNewPassword.trim()) {
-        setProfileError(lang === "km" ? "លេខកូដសម្ងាត់ថ្មីមិនអាចទទេបានឡើយ" : "New password cannot be empty.");
-        return;
-      }
-      if (profileNewPassword !== profileConfirmNewPassword) {
-        setProfileError(t.passwordsMismatch || "Passwords do not match.");
-        return;
-      }
+
+    if ((wantsEmailChange || wantsPasswordChange) && !profileCurrentPassword) {
+      setProfileError(lang === "km" ? "សូមបញ្ចូលលេខសម្ងាត់បច្ចុប្បន្ន ដើម្បីប្តូរ Email ឬ Password។" : "Enter the current password to change email or password.");
+      return;
+    }
+    if (wantsPasswordChange && !profileNewPassword.trim()) {
+      setProfileError(lang === "km" ? "លេខកូដសម្ងាត់ថ្មីមិនអាចទទេបានឡើយ" : "New password cannot be empty.");
+      return;
+    }
+    if (wantsPasswordChange && profileNewPassword !== profileConfirmNewPassword) {
+      setProfileError(t.passwordsMismatch || "Passwords do not match.");
+      return;
     }
 
-    localStorage.setItem("rttc_admin_username", profileUsername.trim());
-    localStorage.setItem("rttc_admin_name", profileDisplayName.trim());
-    localStorage.setItem("rttc_admin_email", profileEmail.trim());
-    setAdminUsername(profileUsername.trim());
-    setAdminDisplayName(profileDisplayName.trim());
-    setAdminEmail(profileEmail.trim());
+    try {
+      if (wantsEmailChange || wantsPasswordChange) {
+        const credential = EmailAuthProvider.credential(firebaseUser.email, profileCurrentPassword);
+        await reauthenticateWithCredential(firebaseUser, credential);
+      }
 
-    if (wantsPasswordChange) {
-      localStorage.setItem("rttc_admin_pwd", profileNewPassword);
-      setAdminPassword(profileNewPassword);
+      await updateProfile(firebaseUser, { displayName: profileDisplayName.trim() || null });
+      if (wantsEmailChange) await updateEmail(firebaseUser, profileEmail.trim());
+      if (wantsPasswordChange) await updatePassword(firebaseUser, profileNewPassword);
+
+      setProfileCurrentPassword("");
+      setProfileNewPassword("");
+      setProfileConfirmNewPassword("");
+      setProfileError("");
+      setShowProfileModal(false);
+      triggerToast(t.toastAdminUpdated || "Administrator profile updated successfully!");
+    } catch (error) {
+      setProfileError(getFirebaseAuthErrorMessage(error));
     }
-
-    setProfileCurrentPassword("");
-    setProfileNewPassword("");
-    setProfileConfirmNewPassword("");
-    setProfileError("");
-    setShowProfileModal(false);
-    triggerToast(t.toastAdminUpdated || "Administrator profile updated successfully!");
   };
 
-  const handleResetPasswordSubmit = (e: React.FormEvent) => {
+  const handleResetPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (resetNewPassword.trim() === "") {
-      setResetError(lang === "km" ? "លេខកូដសម្ងាត់មិនអាចទទេបានទេ" : "Password cannot be empty.");
+    const email = resetNewPassword.trim() || inputUsername.trim();
+    if (!email) {
+      setResetError(lang === "km" ? "សូមបញ្ចូលអ៊ីមែលរដ្ឋបាល។" : "Please enter the admin email address.");
       return;
     }
-    if (resetNewPassword !== resetConfirmPassword) {
-      setResetError(t.passwordsMismatch || "Passwords match error");
-      return;
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetError("");
+      setResetNewPassword("");
+      setResetConfirmPassword("");
+      setAuthView("login");
+      triggerToast(lang === "km" ? "បានផ្ញើតំណកំណត់លេខសម្ងាត់ទៅអ៊ីមែលរួចហើយ។" : "Password reset link sent to the admin email.");
+    } catch (error) {
+      setResetError(getFirebaseAuthErrorMessage(error));
     }
-    
-    // Persist new password and update memory
-    localStorage.setItem("rttc_admin_pwd", resetNewPassword);
-    setAdminPassword(resetNewPassword);
-    setResetError("");
-    setResetNewPassword("");
-    setResetConfirmPassword("");
-    setAuthView("login");
-    triggerToast(t.resetPassSuccess || "Password reset successful!");
   };
 
-  const handleGoogleAccountSelect = (email: string, name: string) => {
-    setIsAuthenticated(true);
-    sessionStorage.setItem("rttc_auth_active", "true");
-    setShowGoogleModal(false);
-    triggerToast(`${t.googleSignInSuccess || "Google signed in as:"} ${name} (${email})`);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    sessionStorage.removeItem("rttc_auth_active");
+  const handleLogout = async () => {
+    await signOut(auth);
     triggerToast(lang === "km" ? "បានចាកចេញពីប្រព័ន្ធដោយជោគជ័យ" : "Successfully logged out from portal.");
   };
 
@@ -1243,6 +1251,16 @@ export default function App() {
     return renderStudentCheckInGate();
   }
 
+  if (isAuthLoading && !isStudentCheckInView) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-6 text-center text-sm font-bold text-slate-700">
+          {lang === "km" ? "កំពុងពិនិត្យ Firebase Authentication..." : "Checking Firebase Authentication..."}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#fafafc] text-slate-800 font-sans leading-relaxed selection:bg-emerald-500 selection:text-white" id=" rttc-app">
       
@@ -1536,77 +1554,6 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Google Account Selector Dialog */}
-      <AnimatePresence>
-        {showGoogleModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="bg-white rounded-3xl border border-slate-200 max-w-sm w-full p-6 shadow-2xl relative"
-            >
-              <button
-                onClick={() => setShowGoogleModal(false)}
-                className="absolute top-4 right-4 p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="text-center mb-5 pt-3">
-                <svg className="w-10 h-10 mx-auto mb-3" viewBox="0 0 24 24" fill="none">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.96 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                </svg>
-                <h3 className="text-md font-bold text-slate-900">{lang === "km" ? "ភ្ជាប់គណនី Google" : "Google Sign-In Connection"}</h3>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">{t.googleAccountPrompt}</p>
-              </div>
-
-              <div className="space-y-2.5">
-                {[
-                  { name: "អ៊ាន ប៉េងអ៊ាង", email: "pengeangean@gmail.com", role: lang === "km" ? "ប្រធានថ្នាក់ (Monitor)" : "Class Monitor", avatar: "👨‍💻" },
-                  { name: "គណៈគ្រប់គ្រង RTTC", email: "admin.rttc.kc@gmail.com", role: lang === "km" ? "រដ្ឋបាលមជ្ឈមណ្ឌល" : "RTTC Board Admin", avatar: "🏢" },
-                  { name: "គ្រូឧទ្ទេស R01", email: "instructor.r01@gmail.com", role: lang === "km" ? "សាស្រ្តាចារ្យថ្នាក់ R01" : "R01 Class Mentor", avatar: "👨‍🏫" }
-                ].map((account) => (
-                  <button
-                    key={account.email}
-                    onClick={() => handleGoogleAccountSelect(account.email, account.name)}
-                    className="w-full text-left p-3.5 bg-slate-50 hover:bg-emerald-50 border border-slate-200/80 hover:border-emerald-300 rounded-2xl flex items-center gap-3 transition-all"
-                  >
-                    <div className="w-9 h-9 bg-white border border-slate-200/60 rounded-full flex items-center justify-center text-sm shadow-xs">
-                      {account.avatar}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-xs font-bold text-slate-955 block leading-snug">{account.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono block leading-snug truncate">{account.email}</span>
-                    </div>
-                    <span className="text-[9px] font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded border border-slate-205 shrink-0 self-center">
-                      {account.role}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100 text-center">
-                <button
-                  onClick={() => setShowGoogleModal(false)}
-                  className="text-xs text-slate-400 hover:text-emerald-700 font-bold transition-colors"
-                >
-                  {t.cancel}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Admin Profile Details & Password Management Dialog */}
       <AnimatePresence>
         {showProfileModal && (
@@ -1671,7 +1618,7 @@ export default function App() {
                   {/* Username */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                      {t.adminUsernameLabel}
+                      {t.adminEmailLabel}
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -1776,36 +1723,8 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Reset to Default Option Quick Button */}
-                <div className="pt-2 flex flex-wrap justify-between items-center gap-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfirmModal({
-                        isOpen: true,
-                        title: lang === "km" ? "កំណត់លេខសម្ងាត់ឡើងវិញ" : "Reset Password to Default",
-                        message: lang === "km" 
-                          ? "តើអ្នកចង់កំណត់លេខកូដសម្ងាត់រដ្ឋបាលត្រឡប់ទៅលេខកូដដើម (@rttc2026) វិញដែរឬទេ?" 
-                          : "Are you sure you want to reset the administrative password to default (@rttc2026)?",
-                        type: "reset",
-                        actionLabel: lang === "km" ? "កំណត់គណនីឡើងវិញ" : "Reset Password",
-                        cancelLabel: lang === "km" ? "រក្សាដដែល" : "Keep Current",
-                        onConfirm: () => {
-                          localStorage.setItem("rttc_admin_pwd", "@rttc2026");
-                          setAdminPassword("@rttc2026");
-                          setProfileCurrentPassword("");
-                          setProfileNewPassword("");
-                          setProfileConfirmNewPassword("");
-                          setProfileError("");
-                          triggerToast(lang === "km" ? "បានកំណត់លេខកូដសម្ងាត់ដើមឡើងវិញដោយជោគជ័យ!" : "Password successfully reset to default (@rttc2026)!");
-                          setConfirmModal(prev => ({ ...prev, isOpen: false }));
-                        }
-                      });
-                    }}
-                    className="text-xs font-bold text-teal-600 hover:text-teal-850 transition-all underline bg-transparent border-none p-0 cursor-pointer"
-                  >
-                    {lang === "km" ? "↺ កំណត់លេខកូដដើមឡើងវិញ (@rttc2026)" : "↺ Reset to Default Password (@rttc2026)"}
-                  </button>
+                <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500 leading-relaxed">
+                  {lang === "km" ? "លេខសម្ងាត់ត្រូវបានគ្រប់គ្រងដោយ Firebase Authentication។ មិនមានលេខសម្ងាត់ដើមនៅក្នុង Source Code ទៀតទេ។" : "Password is managed by Firebase Authentication. No default password is stored in the source code."}
                 </div>
 
                 <div className="flex gap-2 pt-3 border-t border-slate-100">
@@ -1886,15 +1805,15 @@ export default function App() {
               {authView === "login" && (
                 <form onSubmit={handleAdminSignIn} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-1">{t.username}</label>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-1">{lang === "km" ? "អ៊ីមែល" : "Email"}</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                         <Users className="w-4 h-4" />
                       </div>
                       <input
-                        type="text"
+                        type="email"
                         required
-                        placeholder={lang === "km" ? "ឧទាហរណ៍៖ rttc_user" : "e.g. rttc_user"}
+                        placeholder={lang === "km" ? "ឧទាហរណ៍៖ admin@example.com" : "e.g. admin@example.com"}
                         value={inputUsername}
                         onChange={(e) => setInputUsername(e.target.value)}
                         className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-bold transition-all"
@@ -1945,30 +1864,8 @@ export default function App() {
                     {t.signIn}
                   </button>
 
-                  {/* Or divider */}
-                  <div className="relative my-6 flex py-1 items-center">
-                    <div className="flex-grow border-t border-slate-200"></div>
-                    <span className="flex-shrink mx-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest">{t.orSignInWith}</span>
-                    <div className="flex-grow border-t border-slate-200"></div>
-                  </div>
-
-                  {/* Google Authenticate Button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowGoogleModal(true)}
-                    className="w-full py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-xs sm:text-sm shadow-xs transition-all flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.96 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    </svg>
-                    {t.signInGoogle}
-                  </button>
-
                   <div className="mt-4 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-center text-[11px] text-slate-500 leading-relaxed font-sans">
-                    <strong>Portal Example:</strong> rttc_staff / ••••••••
+                    <strong>Firebase Auth:</strong> Email / Password
                   </div>
                 </form>
               )}
@@ -1978,106 +1875,60 @@ export default function App() {
                 <div className="space-y-5">
                   <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs space-y-2.5">
                     <p className="font-sans leading-relaxed text-slate-650">
-                      RTTC class Portal allows instant sandbox password definition. If you want to reset the administrative password to a custom value, click the action below.
+                      {lang === "km" ? "បញ្ចូលអ៊ីមែលគណនី Admin Firebase ដើម្បីទទួលតំណកំណត់លេខសម្ងាត់ថ្មី។" : "Enter the Firebase admin email to receive a password reset link."}
                     </p>
-                    <div className="pt-2 border-t border-slate-200 flex flex-col gap-1.5 font-sans">
-                      <span className="font-bold text-slate-705">Credential Lookup Hint:</span>
-                      <span className="font-mono text-slate-500">• User Role: <strong className="text-slate-900">staff_rttc</strong></span>
-                      <span className="font-mono text-slate-500">• Security Key: <strong className="text-slate-900">••••••••</strong></span>
-                    </div>
                   </div>
 
-                  <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => setAuthView("reset")}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <RefreshCw className="w-4 h-4 text-white animate-spin-slow" />
-                      {t.simulateReset}
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setAuthView("login");
-                        setWrongCredsError("");
-                      }}
-                      className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <ArrowLeft className="w-4 h-4 text-slate-600" />
-                      {t.backToLogin}
-                    </button>
-                  </div>
+                  <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-1">
+                        {lang === "km" ? "អ៊ីមែល Admin" : "Admin Email"}
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                          <Mail className="w-4 h-4" />
+                        </div>
+                        <input
+                          type="email"
+                          required
+                          placeholder={lang === "km" ? "ឧទាហរណ៍៖ admin@example.com" : "e.g. admin@example.com"}
+                          value={resetNewPassword}
+                          onChange={(e) => setResetNewPassword(e.target.value)}
+                          className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-sans transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {resetError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200/85 text-xs text-rose-700 font-bold rounded-xl text-center">
+                        {resetError}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="submit"
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <RefreshCw className="w-4 h-4 text-white" />
+                        {lang === "km" ? "ផ្ញើតំណកំណត់លេខសម្ងាត់" : "Send Password Reset Link"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthView("login");
+                          setWrongCredsError("");
+                          setResetError("");
+                        }}
+                        className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <ArrowLeft className="w-4 h-4 text-slate-600" />
+                        {t.backToLogin}
+                      </button>
+                    </div>
+                  </form>
                 </div>
-              )}
-
-              {/* VIEW 3: RESET PASSWORD */}
-              {authView === "reset" && (
-                <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-1">
-                      {t.newPassword}
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                      <input
-                        type="password"
-                        required
-                        placeholder="e.g. @rttcNew2026"
-                        value={resetNewPassword}
-                        onChange={(e) => setResetNewPassword(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-1">
-                      {t.confirmNewPassword}
-                    </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <Check className="w-4 h-4" />
-                      </div>
-                      <input
-                        type="password"
-                        required
-                        placeholder="Confirm password"
-                        value={resetConfirmPassword}
-                        onChange={(e) => setResetConfirmPassword(e.target.value)}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 font-mono transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {resetError && (
-                    <div className="p-3 bg-rose-50 border border-rose-200/85 text-xs text-rose-700 font-bold rounded-xl text-center">
-                      {resetError}
-                    </div>
-                  )}
-
-                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                    <button
-                      type="submit"
-                      className="flex-1 py-3 bg-slate-900 hover:bg-emerald-600 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5"
-                    >
-                      <Save className="w-4 h-4 text-white" />
-                      {t.saveProfile}
-                    </button>
-                    
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAuthView("login");
-                        setResetError("");
-                      }}
-                      className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors"
-                    >
-                      {t.cancel}
-                    </button>
-                  </div>
-                </form>
               )}
             </motion.div>
           </div>
@@ -2098,7 +1949,7 @@ export default function App() {
               </span>
               <span className="text-xs px-2.5 py-1 rounded-full font-semibold text-teal-800 bg-teal-50 border border-teal-200/60 inline-flex items-center gap-1">
                 <User className="w-3 h-3 text-teal-600" />
-                <span className="font-bold">{adminDisplayName} ({adminUsername})</span>
+                <span className="font-bold">{adminDisplayName} ({adminEmail})</span>
               </span>
             </div>
 
