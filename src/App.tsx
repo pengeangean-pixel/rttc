@@ -170,7 +170,7 @@ export default function App() {
 
   // Geofence constraints
   const [geofence, setGeofence] = useState<GeofenceConfig>({
-    latitude: 11.9934, // Kampong Cham RTTC Coordinate Center
+    latitude: 12.0004658, // Kampong Cham RTTC Coordinate Center
     longitude: 105.4645,
     radius: 150, // 150 meters
     isEnabled: true
@@ -660,7 +660,7 @@ export default function App() {
     if (!selectedSt) return;
 
     // Check Geofence Coordinates
-    // RTTC: 11.9934, 105.4645
+    // RTTC: 12.0004658, 105.4645
     // Simulated coords:
     const studentLat = simulatedLocation === "inside" ? 11.9935 : 11.9212; // outside is 11.9212 (~8km away at Riverside Kampong Cham)
     const studentLng = simulatedLocation === "inside" ? 105.4646 : 105.4789;
@@ -2906,7 +2906,7 @@ export default function App() {
                       type="number"
                       step="0.0001"
                       value={geofence.latitude}
-                      onChange={(e) => setGeofence({ ...geofence, latitude: parseFloat(e.target.value) || 11.9934 })}
+                      onChange={(e) => setGeofence({ ...geofence, latitude: parseFloat(e.target.value) || 12.0004658 })}
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white text-xs font-mono"
                     />
                   </div>
@@ -2996,7 +2996,7 @@ export default function App() {
                       >
                         <Locate className="w-4 h-4 text-emerald-600" />
                         <span className="font-semibold">Inside RTTC Campus</span>
-                        <span className="text-[9px] text-slate-400 font-mono">(lat: 11.9934)</span>
+                        <span className="text-[9px] text-slate-400 font-mono">(lat: 12.0004658)</span>
                       </button>
 
                       <button
