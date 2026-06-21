@@ -147,29 +147,10 @@ export default function App() {
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [googleUserEmail, setGoogleUserEmail] = useState("");
 
- // Core state collections linked to Firebase
+  // Core state collections linked to Firebase
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [isLoadingCloud, setIsLoadingCloud] = useState(true);
-  });
-
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
-    const saved = localStorage.getItem("rttc_attendance_r01");
-    if (saved) return JSON.parse(saved);
-    
-    // Default attendance for today
-    const today = new Date().toISOString().split('T')[0];
-    return initialStudentsList.map((st, index) => ({
-      id: `${st.id}-${today}`,
-      studentId: st.id,
-      date: today,
-      status: index % 6 === 0 ? "Absent_Permission" : index % 11 === 0 ? "Absent_No_Permission" : "Present",
-      checkInTime: index % 6 !== 0 && index % 11 !== 0 ? "07:15 AM" : undefined,
-      verifiedByQR: index % 4 === 0,
-      latitude: 12.0004658,
-      longitude: 105.4404141
-    }));
-  });
 
   // Current session config
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -444,7 +425,7 @@ export default function App() {
     reader.readAsText(file, "UTF-8");
   };
 
-  const handleConfirmBulkImport = () => {
+  const handleConfirmBulkImport = async () => {
     if (parsedBulkStudents.length === 0) return;
 
     // Merge students list. If ID already exists, overwrite. Otherwise add.
@@ -458,13 +439,23 @@ export default function App() {
       }
     });
 
-    setStudents(merged);
-    setShowBulkImportModal(false);
-    setParsedBulkStudents([]);
-    setBulkImportError("");
-    triggerToast(lang === "km" 
-      ? `បានទាញចូលទិន្នន័យនិស្សិតចំនួន ${parsedBulkStudents.length} នាក់ដោយជោគជ័យ!` 
-      : `Successfully loaded ${parsedBulkStudents.length} student records!`);
+    try {
+      const batch = writeBatch(db);
+      parsedBulkStudents.forEach(st => {
+        batch.set(doc(db, "students", st.id), st);
+      });
+      await batch.commit();
+      setStudents(merged);
+      setShowBulkImportModal(false);
+      setParsedBulkStudents([]);
+      setBulkImportError("");
+      triggerToast(lang === "km" 
+        ? `បានទាញចូលទិន្នន័យនិស្សិតចំនួន ${parsedBulkStudents.length} នាក់ដោយជោគជ័យ!` 
+        : `Successfully loaded ${parsedBulkStudents.length} student records!`);
+    } catch (error) {
+      console.error("Error importing students to Cloud:", error);
+      triggerToast(lang === "km" ? "មានបញ្ហាក្នុងការរក្សាទុកទៅ Cloud" : "Error saving imported students to Cloud");
+    }
   };
 
   // Trigger Toast Notification Helper
@@ -579,7 +570,7 @@ export default function App() {
   };
 
   // Quick State Toggler (Present/Absent-Permission/Absent-No-Permission)
-  const toggleAttendanceStatus = (studentId: string, currentStatus: AttendanceStatus) => {
+  const toggleAttendanceStatus = async (studentId: string, currentStatus: AttendanceStatus) => {
     const todayStr = selectedDate;
     const recordId = `${studentId}-${todayStr}`;
     
@@ -591,43 +582,6 @@ export default function App() {
     } else if (currentStatus === "Absent_Permission") {
       nextStatus = "Absent_No_Permission";
       updatedTime = undefined;
-    } else {
-      nextStatus = "Present";
-      updatedTime = "07:45 AM";
-    }
-
-    const existingIndex = attendance.findIndex(r => r.id === recordId);
-    let updatedAttendance = [...attendance];
-
-    if (existingIndex >= 0) {
-      updatedAttendance[existingIndex] = {
-        ...updatedAttendance[existingIndex],
-        status: nextStatus,
-        checkInTime: updatedTime
-      };
-    } else {
-      updatedAttendance.push({
-        id: recordId,
-        studentId,
-        date: todayStr,
-        status: nextStatus,
-        checkInTime: updatedTime,
-        verifiedByQR: false
-      });
-    }
-
-    const toggleAttendanceStatus = async (studentId: string, currentStatus: AttendanceStatus) => {
-    const todayStr = selectedDate;
-    const recordId = `${studentId}-${todayStr}`;
-    
-    let nextStatus: AttendanceStatus = "Present";
-    let updatedTime: string | null = "07:30 AM";
-    if (currentStatus === "Present") {
-      nextStatus = "Absent_Permission";
-      updatedTime = null;
-    } else if (currentStatus === "Absent_Permission") {
-      nextStatus = "Absent_No_Permission";
-      updatedTime = null;
     } else {
       nextStatus = "Present";
       updatedTime = "07:15 AM";
@@ -680,37 +634,6 @@ export default function App() {
         ...st,
         status: record ? record.status : ("Present" as AttendanceStatus),
         checkInTime: record ? record.checkInTime || undefined : undefined,
-        verifiedByQR: record ? !!record.verifiedByQR : false
-      };
-    });
-  };
-
-  // Statistical calculations
-  const listToday = getDailyStatusList();
-  const filteredList = listToday.filter(st => {
-    const queryStr = searchQuery.toLowerCase();
-    return (
-      st.name.toLowerCase().includes(queryStr) ||
-      st.phoneNumber.includes(queryStr) ||
-      st.address.toLowerCase().includes(queryStr) ||
-      st.telegram.toLowerCase().includes(queryStr)
-    );
-  });
-
-  const totalCount = students.length;
-  const presentCount = listToday.filter(s => s.status === "Present").length;
-  const excusedCount = listToday.filter(s => s.status === "Absent_Permission").length;
-  const absentCount = listToday.filter(s => s.status === "Absent_No_Permission").length;
-  const attendanceRate = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : 0;
-  // Get active student records with attendance statuses merged
-  const getDailyStatusList = () => {
-    const todayStr = selectedDate;
-    return students.map(st => {
-      const record = attendance.find(r => r.studentId === st.id && r.date === todayStr);
-      return {
-        ...st,
-        status: record ? record.status : ("Present" as AttendanceStatus),
-        checkInTime: record ? record.checkInTime : undefined,
         verifiedByQR: record ? !!record.verifiedByQR : false
       };
     });
@@ -865,7 +788,7 @@ export default function App() {
   };
 
   // Handle direct check-in of student from the QR Code scan landing page
-  const handleStudentDirectCheckIn = (isSimulatedOverride: boolean) => {
+  const handleStudentDirectCheckIn = async (isSimulatedOverride: boolean) => {
     if (!studentCheckInId) {
       triggerToast(lang === "km" ? "សូមជ្រើសរើសឈ្មោះរបស់អ្នកជាមុនសិន!" : "Please select your name first!");
       return;
@@ -903,13 +826,19 @@ export default function App() {
       updated.push(checkInRecord);
     }
 
-    setAttendance(updated);
-    setCheckInSuccessDetails({
-      studentName: selectedSt.name,
-      time: formattedCheckInTime,
-      date: todayStr
-    });
-    triggerToast(lang === "km" ? "✓ ការចុះវត្តមានផ្ទៀងផ្ទាត់ដោយជោគជ័យ!" : "✓ QR Attendance verified and submitted!");
+    try {
+      await setDoc(doc(db, "attendance", recordId), checkInRecord);
+      setAttendance(updated);
+      setCheckInSuccessDetails({
+        studentName: selectedSt.name,
+        time: formattedCheckInTime,
+        date: todayStr
+      });
+      triggerToast(lang === "km" ? "✓ ការចុះវត្តមានផ្ទៀងផ្ទាត់ដោយជោគជ័យ!" : "✓ QR Attendance verified and submitted!");
+    } catch (error) {
+      console.error("Error submitting QR check-in to Cloud:", error);
+      triggerToast(lang === "km" ? "មានបញ្ហាក្នុងការផ្ញើវត្តមានទៅ Cloud" : "Error submitting attendance to Cloud");
+    }
   };
 
   // Render direct Student portal landing page layout
@@ -1211,34 +1140,42 @@ export default function App() {
       return;
     }
 
-    const executeSave = () => {
-      if (editingStudentId) {
-        // Edit mode
-        const updated = students.map(s => s.id === editingStudentId ? { ...s, ...studentForm } : s);
-        setStudents(updated);
-        setEditingStudentId(null);
-        triggerToast(t.toastSaved);
-      } else {
-        // Add mode
-        const newStudent: Student = {
-          id: `s-${Date.now()}`,
-          ...studentForm
-        };
-        setStudents([...students, newStudent]);
-        triggerToast(t.toastSaved);
-      }
+    const executeSave = async () => {
+      try {
+        if (editingStudentId) {
+          // Edit mode
+          const updatedStudent: Student = { id: editingStudentId, ...studentForm };
+          await setDoc(doc(db, "students", editingStudentId), updatedStudent);
+          const updated = students.map(s => s.id === editingStudentId ? updatedStudent : s);
+          setStudents(updated);
+          setEditingStudentId(null);
+          triggerToast(t.toastSaved);
+        } else {
+          // Add mode
+          const newStudent: Student = {
+            id: `s-${Date.now()}`,
+            ...studentForm
+          };
+          await setDoc(doc(db, "students", newStudent.id), newStudent);
+          setStudents([...students, newStudent]);
+          triggerToast(t.toastSaved);
+        }
 
-      // Reset Form
-      setStudentForm({
-        name: "",
-        gender: "ប្រុស",
-        dob: "2004-01-01",
-        address: "",
-        phoneNumber: "",
-        telegram: "",
-        isMonitor: false
-      });
-      setShowAddForm(false);
+        // Reset Form
+        setStudentForm({
+          name: "",
+          gender: "ប្រុស",
+          dob: "2004-01-01",
+          address: "",
+          phoneNumber: "",
+          telegram: "",
+          isMonitor: false
+        });
+        setShowAddForm(false);
+      } catch (error) {
+        console.error("Error saving student to Cloud:", error);
+        triggerToast(lang === "km" ? "មានបញ្ហាក្នុងការរក្សាទុកទៅ Cloud" : "Error saving student to Cloud");
+      }
     };
 
     if (editingStudentId) {
@@ -1251,8 +1188,8 @@ export default function App() {
         type: "edit",
         actionLabel: lang === "km" ? "យល់ព្រមរក្សាទុក" : "Save Changes",
         cancelLabel: lang === "km" ? "បោះបង់" : "Cancel",
-        onConfirm: () => {
-          executeSave();
+        onConfirm: async () => {
+          await executeSave();
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
       });
@@ -1288,9 +1225,15 @@ export default function App() {
       type: "delete",
       actionLabel: lang === "km" ? "យល់ព្រមលុប" : "Confirm Delete",
       cancelLabel: lang === "km" ? "បោះបង់" : "Cancel",
-      onConfirm: () => {
-        setStudents(prev => prev.filter(s => s.id !== id));
-        triggerToast(t.toastDeleted);
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, "students", id));
+          setStudents(prev => prev.filter(s => s.id !== id));
+          triggerToast(t.toastDeleted);
+        } catch (error) {
+          console.error("Error deleting student from Cloud:", error);
+          triggerToast(lang === "km" ? "មានបញ្ហាក្នុងការលុបពី Cloud" : "Error deleting student from Cloud");
+        }
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
