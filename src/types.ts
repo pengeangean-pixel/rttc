@@ -5,28 +5,33 @@ export interface Student {
   name: string;
   gender: "Male" | "Female" | "ប្រុស" | "ស្រី";
   dob: string;
+
+  profilePhoto?: string;
+
   address: string;
+  village?: string;
+  commune?: string;
+  district?: string;
+  province?: string;
+
+  schoolName?: string;
+
   phoneNumber: string;
   telegram: string;
   isMonitor?: boolean;
 }
 
-export type AttendanceStatus = "Present" | "Absent_Permission" | "Absent_No_Permission";
-
 export interface AttendanceRecord {
-  id: string; // studentId + date
+  id: string;
   studentId: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   status: AttendanceStatus;
   checkInTime?: string;
   latitude?: number;
   longitude?: number;
   verifiedByQR?: boolean;
-}
 
-export interface GeofenceConfig {
-  latitude: number;
-  longitude: number;
-  radius: number; // in meters
-  isEnabled: boolean;
+  morningAbsent?: boolean;
+  afternoonAbsent?: boolean;
+  absenceNote?: string;
 }
