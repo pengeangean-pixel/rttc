@@ -3010,7 +3010,7 @@ export default function App() {
 
                       <div>
                         <label htmlFor="form-addr" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                          {lang === "km" ? "អាសយដ្ឋានសរុប / បន្ថែម" : "Full / Extra Address"}
+                          {lang === "km" ? "អាសយដ្ឋានសាលាកំពុងបង្រៀន" : "Full / Extra Address"}
                         </label>
                         <textarea 
                           id="form-addr"
