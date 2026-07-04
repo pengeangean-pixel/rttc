@@ -2854,7 +2854,7 @@ export default function App() {
                       <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                         <div>
                           <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wide">
-                            {lang === "km" ? "អាសយដ្ឋានដាច់ដោយឡែក" : "Separated Address"} *
+                            {lang === "km" ? "អាសយដ្ឋានបច្ចុប្បន្ន" : "Separated Address"} *
                           </h4>
                           <p className="text-[10px] text-slate-400 mt-0.5">
                             {lang === "km" ? "បំពេញ ភូមិ / ឃុំ / ស្រុក / ខេត្ត ដើម្បីងាយស្វែងរក និងរាយការណ៍" : "Fill village / commune / district / province for cleaner reports."}
@@ -2894,7 +2894,7 @@ export default function App() {
 
                       <div>
                         <label htmlFor="form-addr" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                          {lang === "km" ? "អាសយដ្ឋានសរុប / បន្ថែម" : "Full / Extra Address"}
+                          {lang === "km" ? "អាសយដ្ឋានសាលាកំពុងបង្រៀន" : "Full / Extra Address"}
                         </label>
                         <textarea 
                           id="form-addr"
