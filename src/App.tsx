@@ -74,6 +74,65 @@ const removeUndefinedFields = <T extends object>(data: T) => {
   ) as Partial<T>;
 };
 
+const PROFILE_PHOTO_MAX_SIZE_BYTES = 2 * 1024 * 1024; // 2MB upload limit
+const PROFILE_PHOTO_MAX_DIMENSION = 512;
+const PROFILE_PHOTO_TARGET_MAX_BYTES = 750 * 1024; // Keep the saved data URL safely below Firestore document limits.
+
+const estimateDataUrlBytes = (dataUrl: string) => {
+  const base64 = dataUrl.split(",")[1] || "";
+  return Math.ceil((base64.length * 3) / 4);
+};
+
+const resizeProfilePhotoToDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        const scale = Math.min(
+          1,
+          PROFILE_PHOTO_MAX_DIMENSION / Math.max(img.width, img.height)
+        );
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas is not supported in this browser.");
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const qualities = [0.86, 0.76, 0.66, 0.56, 0.46];
+        let dataUrl = canvas.toDataURL("image/jpeg", qualities[0]);
+        for (const quality of qualities) {
+          const candidate = canvas.toDataURL("image/jpeg", quality);
+          dataUrl = candidate;
+          if (estimateDataUrlBytes(candidate) <= PROFILE_PHOTO_TARGET_MAX_BYTES) break;
+        }
+
+        URL.revokeObjectURL(objectUrl);
+        resolve(dataUrl);
+      } catch (error) {
+        URL.revokeObjectURL(objectUrl);
+        reject(error);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Unable to read this image file."));
+    };
+
+    img.src = objectUrl;
+  });
+};
+
 export default function App() {
   // Locale state
   const [lang, setLang] = useState<"km" | "en">("km");
@@ -492,6 +551,34 @@ export default function App() {
     setTimeout(() => {
       setToast(null);
     }, 4500);
+  };
+
+  const handleProfilePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      triggerToast(lang === "km" ? "សូមជ្រើសរើសឯកសាររូបភាពប៉ុណ្ណោះ" : "Please choose an image file only.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > PROFILE_PHOTO_MAX_SIZE_BYTES) {
+      triggerToast(lang === "km" ? "រូបភាពធំពេក។ សូមប្រើរូបភាពមិនលើស 2MB" : "Image is too large. Please use a photo up to 2MB.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      const dataUrl = await resizeProfilePhotoToDataUrl(file);
+      setStudentForm(prev => ({ ...prev, profilePhoto: dataUrl }));
+      triggerToast(lang === "km" ? "បានបញ្ចូលរូបភាព Profile រួចរាល់" : "Profile photo uploaded successfully.");
+    } catch (error) {
+      console.error("Error processing profile photo:", error);
+      triggerToast(lang === "km" ? "មិនអាចអានរូបភាពនេះបានទេ" : "Could not read this photo.");
+    } finally {
+      event.target.value = "";
+    }
   };
 
   const getFirebaseAuthErrorMessage = (error: unknown) => {
@@ -2751,18 +2838,47 @@ export default function App() {
                           />
                         </div>
 
-                        <div>
+                        <div className="sm:col-span-2">
                           <label htmlFor="form-profile-photo" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
                             {lang === "km" ? "រូបភាព Profile" : "Profile Photo"}
                           </label>
-                          <input
-                            id="form-profile-photo"
-                            type="url"
-                            placeholder={lang === "km" ? "URL រូបភាពសិស្ស" : "Student photo URL"}
-                            value={studentForm.profilePhoto || ""}
-                            onChange={(e) => setStudentForm({ ...studentForm, profilePhoto: e.target.value })}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
-                          />
+                          <div className="flex flex-col sm:flex-row gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-3">
+                            <div className="flex items-center justify-center w-20 h-20 rounded-2xl bg-white border border-slate-200 overflow-hidden shrink-0">
+                              {studentForm.profilePhoto ? (
+                                <img
+                                  src={studentForm.profilePhoto}
+                                  alt={studentForm.name || "Student profile"}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <User className="w-8 h-8 text-slate-300" />
+                              )}
+                            </div>
+                            <div className="flex-1 space-y-2">
+                              <input
+                                id="form-profile-photo"
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg,image/webp"
+                                onChange={handleProfilePhotoUpload}
+                                className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-emerald-600 file:px-4 file:py-2.5 file:text-xs file:font-bold file:text-white hover:file:bg-emerald-700 file:cursor-pointer"
+                              />
+                              <p className="text-[10px] text-slate-500 leading-relaxed">
+                                {lang === "km"
+                                  ? "ចំណាំ៖ អាច upload រូបភាព PNG/JPG/WebP បាន។ ទំហំអតិបរមា 2MB ហើយប្រព័ន្ធនឹងបង្រួមរូបសម្រាប់រក្សាទុកដោយស្វ័យប្រវត្តិ។"
+                                  : "Note: PNG/JPG/WebP only. Max 2MB. The system automatically resizes the photo before saving."}
+                              </p>
+                              {studentForm.profilePhoto && (
+                                <button
+                                  type="button"
+                                  onClick={() => setStudentForm(prev => ({ ...prev, profilePhoto: "" }))}
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 px-3 py-2 text-[11px] font-bold text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  {lang === "km" ? "លុបរូបភាព" : "Remove photo"}
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
                         <div>
@@ -2854,7 +2970,7 @@ export default function App() {
                       <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                         <div>
                           <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wide">
-                            {lang === "km" ? "អាសយដ្ឋានបច្ចុប្បន្ន" : "Separated Address"} *
+                            {lang === "km" ? "អាសយដ្ឋានដាច់ដោយឡែក" : "Separated Address"} *
                           </h4>
                           <p className="text-[10px] text-slate-400 mt-0.5">
                             {lang === "km" ? "បំពេញ ភូមិ / ឃុំ / ស្រុក / ខេត្ត ដើម្បីងាយស្វែងរក និងរាយការណ៍" : "Fill village / commune / district / province for cleaner reports."}
@@ -2894,7 +3010,7 @@ export default function App() {
 
                       <div>
                         <label htmlFor="form-addr" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                          {lang === "km" ? "អាសយដ្ឋានសាលាកំពុងបង្រៀន" : "School Address"}
+                          {lang === "km" ? "អាសយដ្ឋានសរុប / បន្ថែម" : "Full / Extra Address"}
                         </label>
                         <textarea 
                           id="form-addr"
