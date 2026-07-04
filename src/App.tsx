@@ -179,6 +179,7 @@ export default function App() {
     isMonitor: false
   });
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   // Student QR Scanner Simulator states
   const [simulatedStudentId, setSimulatedStudentId] = useState<string>("");
@@ -1146,6 +1147,18 @@ export default function App() {
     );
   };
 
+  const isAllStudentsSelected = students.length > 0 && selectedStudentIds.length === students.length;
+
+  const toggleStudentSelection = (id: string) => {
+    setSelectedStudentIds(prev =>
+      prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllStudents = () => {
+    setSelectedStudentIds(isAllStudentsSelected ? [] : students.map(st => st.id));
+  };
+
   // Student Admin Form Submission
   const handleSaveStudent = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1243,10 +1256,49 @@ export default function App() {
         try {
           await deleteDoc(doc(db, "students", id));
           setStudents(prev => prev.filter(s => s.id !== id));
+          setSelectedStudentIds(prev => prev.filter(selectedId => selectedId !== id));
           triggerToast(t.toastDeleted);
         } catch (error) {
           console.error("Error deleting student from Cloud:", error);
           triggerToast(lang === "km" ? "មានបញ្ហាក្នុងការលុបពី Cloud" : "Error deleting student from Cloud");
+        }
+        setConfirmModal(prev => ({ ...prev, isOpen: false }));
+      }
+    });
+  };
+
+  const handleBulkDeleteStudents = () => {
+    if (selectedStudentIds.length === 0) {
+      triggerToast(lang === "km" ? "សូមជ្រើសរើសសិស្សជាមុនសិន" : "Please select students first");
+      return;
+    }
+
+    const selectedNames = students
+      .filter(st => selectedStudentIds.includes(st.id))
+      .map(st => st.name);
+
+    setConfirmModal({
+      isOpen: true,
+      title: lang === "km" ? "លុបសិស្សដែលបានជ្រើសរើស" : "Delete Selected Students",
+      message: lang === "km"
+        ? `តើអ្នកពិតជាចង់លុបសិស្សចំនួន ${selectedStudentIds.length} នាក់ចេញពីបញ្ជីមែនទេ?${selectedNames.length <= 5 ? ` (${selectedNames.join(", ")})` : ""} សកម្មភាពនេះមិនអាចសង្គ្រោះវិញបានឡើយ!`
+        : `Are you sure you want to delete ${selectedStudentIds.length} selected students?${selectedNames.length <= 5 ? ` (${selectedNames.join(", ")})` : ""} This action cannot be undone!`,
+      type: "delete",
+      actionLabel: lang === "km" ? "យល់ព្រមលុបទាំងអស់" : "Delete Selected",
+      cancelLabel: lang === "km" ? "បោះបង់" : "Cancel",
+      onConfirm: async () => {
+        try {
+          const batch = writeBatch(db);
+          selectedStudentIds.forEach(id => {
+            batch.delete(doc(db, "students", id));
+          });
+          await batch.commit();
+          setStudents(prev => prev.filter(s => !selectedStudentIds.includes(s.id)));
+          setSelectedStudentIds([]);
+          triggerToast(lang === "km" ? "បានលុបសិស្សដែលបានជ្រើសរើសដោយជោគជ័យ" : "Selected students deleted successfully");
+        } catch (error) {
+          console.error("Error bulk deleting students from Cloud:", error);
+          triggerToast(lang === "km" ? "មានបញ្ហាក្នុងការលុបសិស្សច្រើនពី Cloud" : "Error deleting selected students from Cloud");
         }
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
@@ -2390,6 +2442,37 @@ export default function App() {
                   <FileSpreadsheet className="w-4 h-4 text-emerald-600 animate-pulse" />
                   {t.importBulkBtn || "នាំចូលនិស្សិតច្រើន (CSV)"}
                 </button>
+
+                <button
+                  onClick={handleBulkDeleteStudents}
+                  disabled={selectedStudentIds.length === 0}
+                  className={`px-5 py-3 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all active:scale-95 ${
+                    selectedStudentIds.length > 0
+                      ? "bg-red-600 hover:bg-red-700 text-white hover:scale-[1.02]"
+                      : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  }`}
+                  id="btn-bulk-delete-students"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {lang === "km" ? `លុប (${selectedStudentIds.length})` : `Delete (${selectedStudentIds.length})`}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isAllStudentsSelected}
+                  onChange={toggleSelectAllStudents}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                />
+                {lang === "km" ? "ជ្រើសរើសទាំងអស់" : "Select all"}
+              </label>
+              <div className="text-[11px] font-semibold text-slate-500">
+                {lang === "km"
+                  ? `បានជ្រើសរើស ${selectedStudentIds.length} / ${students.length} នាក់`
+                  : `${selectedStudentIds.length} / ${students.length} selected`}
               </div>
             </div>
 
@@ -2571,13 +2654,23 @@ export default function App() {
                 <div 
                   key={st.id} 
                   className={`border rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:scale-[1.02] hover:-translate-y-0.5 ${
-                    st.isMonitor 
-                      ? "border-amber-300 bg-amber-50/15 hover:border-amber-450 hover:bg-gradient-to-tr hover:from-amber-50/10 hover:to-amber-100/10" 
-                      : "bg-[#fdfdfe] border-slate-200/80 hover:border-emerald-300 hover:bg-gradient-to-tr hover:from-white hover:to-emerald-50/5"
+                    selectedStudentIds.includes(st.id)
+                      ? "border-red-300 bg-red-50/30 ring-2 ring-red-100"
+                      : st.isMonitor 
+                        ? "border-amber-300 bg-amber-50/15 hover:border-amber-450 hover:bg-gradient-to-tr hover:from-amber-50/10 hover:to-amber-100/10" 
+                        : "bg-[#fdfdfe] border-slate-200/80 hover:border-emerald-300 hover:bg-gradient-to-tr hover:from-white hover:to-emerald-50/5"
                   }`}
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <div>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedStudentIds.includes(st.id)}
+                        onChange={() => toggleStudentSelection(st.id)}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                        aria-label={lang === "km" ? `ជ្រើសរើស ${st.name}` : `Select ${st.name}`}
+                      />
+                      <div>
                       <h4 className="font-extrabold text-[#0f172a] text-base font-sans flex items-center gap-1.5">
                         {st.name}
                         {st.isMonitor && (
@@ -2587,6 +2680,7 @@ export default function App() {
                         )}
                       </h4>
                       <span className="text-[11px] text-slate-400 font-mono mt-0.5 block italic">{lang === "km" ? "ថ្ងៃខែឆ្នាំកំណើត៖" : "DOB:"} {st.dob}</span>
+                      </div>
                     </div>
 
                     <div className="flex gap-1.5">
