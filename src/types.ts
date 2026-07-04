@@ -20,7 +20,6 @@ export interface Student {
 
   phoneNumber: string;
   telegram: string;
-  isMonitor?: boolean;
 }
 
 export type AttendanceStatus = "Present" | "Absent_Permission" | "Absent_No_Permission";
