@@ -2888,7 +2888,7 @@ export default function App() {
                           <input
                             id="form-school-name"
                             type="text"
-                            placeholder={lang === "km" ? "ឧ. វិទ្យាល័យកំពង់ចាម" : "e.g., Kampong Cham High School"}
+                            placeholder={lang === "km" ? "សាលាបឋមសិក្សាប៊ុនរ៉ានីហ៊ុនសែនក្ដុលផ្សារ" : "e.g., Kampong Cham High School"}
                             value={studentForm.schoolName || ""}
                             onChange={(e) => setStudentForm({ ...studentForm, schoolName: e.target.value })}
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
