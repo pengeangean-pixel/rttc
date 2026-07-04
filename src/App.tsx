@@ -1600,14 +1600,14 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-gradient-to-tr from-[#0b0f19]/90 via-[#111827]/85 to-[#064e4b]/40 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto"
+            className="fixed inset-0 bg-gradient-to-tr from-[#0b0f19]/90 via-[#111827]/85 to-[#064e4b]/40 backdrop-blur-md z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto"
           >
             <motion.div
               initial={{ scale: 0.9, y: 30, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.9, y: 30, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="bg-white rounded-3xl border border-slate-100 max-w-md w-full p-6 shadow-2xl relative space-y-5 overflow-hidden font-sans"
+              className="bg-white rounded-3xl border border-slate-100 max-w-2xl w-full shadow-2xl relative my-0 sm:my-2 font-sans overflow-hidden max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col"
             >
               {/* Highlight gradient line at top */}
               <div className={`absolute top-0 left-0 right-0 h-1.5 ${
@@ -2820,7 +2820,10 @@ export default function App() {
                       </button>
                     </div>
 
-                    <form onSubmit={handleSaveStudent} className="space-y-4">
+                    <form
+  onSubmit={handleSaveStudent}
+  className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 pb-5 sm:pb-6 space-y-4"
+>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         
                         <div>
