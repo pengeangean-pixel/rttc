@@ -169,17 +169,25 @@ export default function App() {
 
   // Admin student form state
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
-  const [studentForm, setStudentForm] = useState<Omit<Student, "id">>({
+  const emptyStudentForm: Omit<Student, "id"> = {
     name: "",
     gender: "ប្រុស",
     dob: "2004-01-01",
+    profilePhoto: "",
+    schoolName: "",
     address: "",
+    village: "",
+    commune: "",
+    district: "",
+    province: "",
     phoneNumber: "",
     telegram: "",
     isMonitor: false
-  });
+  };
+  const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [studentInfoSearch, setStudentInfoSearch] = useState("");
 
   // Student QR Scanner Simulator states
   const [simulatedStudentId, setSimulatedStudentId] = useState<string>("");
@@ -343,7 +351,13 @@ export default function App() {
 
       const phoneNumber = getVal(["phone", "ទូរស័ព្ទ", "លេខទូរស័ព្ទ", "tel"]) || "096";
       const telegram = getVal(["telegram", "តេឡេក្រាម", "គណនី", "username", "tg"]) || "";
-      const address = getVal(["address", "អាសយដ្ឋាន", "ទីកន្លែងរស់នៅ", "ខេត្ត"]) || "កំពង់ចាម";
+      const profilePhoto = getVal(["profile", "photo", "image", "រូបភាព", "រូបថត"]);
+      const schoolName = getVal(["school", "school name", "ឈ្មោះសាលា", "សាលា"]);
+      const village = getVal(["village", "ភូមិ"]);
+      const commune = getVal(["commune", "ឃុំ", "សង្កាត់"]);
+      const district = getVal(["district", "ស្រុក", "ក្រុង", "ខណ្ឌ"]);
+      const province = getVal(["province", "ខេត្ត", "រាជធានី"]);
+      const address = getVal(["address", "អាសយដ្ឋាន", "ទីកន្លែងរស់នៅ"]) || [village, commune, district, province].filter(Boolean).join(" ") || "កំពង់ចាម";
       
       const rawMonitor = getVal(["monitor", "ប្រធានថ្នាក់", "is monitor", "ប្រធាន"]);
       const isMonitor = rawMonitor ? (rawMonitor.toLowerCase() === "true" || rawMonitor === "yes" || rawMonitor === "1" || rawMonitor.includes("បាទ") || rawMonitor.includes("ចាស")) : false;
@@ -353,9 +367,15 @@ export default function App() {
         name,
         gender,
         dob,
+        profilePhoto,
+        schoolName,
         phoneNumber,
         telegram,
         address,
+        village,
+        commune,
+        district,
+        province,
         isMonitor
       });
     }
@@ -367,11 +387,11 @@ export default function App() {
   const handleDownloadCSVTemplate = () => {
     // UTF-8 BOM helps Excel recognize Khmer scripts
     const BOM = "\uFEFF";
-    const headers = ["ID", "Name", "Gender", "DOB", "PhoneNumber", "Telegram", "Address", "IsMonitor"];
+    const headers = ["ID", "Name", "Gender", "DOB", "ProfilePhoto", "SchoolName", "PhoneNumber", "Telegram", "Village", "Commune", "District", "Province", "Address", "IsMonitor"];
     const sampleRows = [
-      ["s-101", "លី រតនៈ", "ប្រុស", "2004-10-14", "012334455", "@ratanak_ly", "ក្រុងកំពង់ចាម ខេត្តកំពង់ចាម", "FALSE"],
-      ["s-102", "សុខ សុភក្ត្រ", "ស្រី", "2003-05-18", "0968877661", "@sopheak_sok", "ស្រុកព្រៃឈរ ខេត្តកំពង់ចាម", "FALSE"],
-      ["s-103", "មុន្នី ច័ន្ទដារ៉ា", "ប្រុស", "2004-08-05", "0889988772", "@dara_rttc", "ស្រុកចំការលើ ខេត្តកំពង់ចាម", "TRUE"]
+      ["s-101", "លី រតនៈ", "ប្រុស", "2004-10-14", "", "វិទ្យាល័យកំពង់ចាម", "012334455", "@ratanak_ly", "ភូមិវាល", "ឃុំព្រៃឈរ", "ស្រុកព្រៃឈរ", "ខេត្តកំពង់ចាម", "ភូមិវាល ឃុំព្រៃឈរ ស្រុកព្រៃឈរ ខេត្តកំពង់ចាម", "FALSE"],
+      ["s-102", "សុខ សុភក្ត្រ", "ស្រី", "2003-05-18", "", "វិទ្យាល័យហ៊ុនសែន", "0968877661", "@sopheak_sok", "ភូមិថ្មី", "ឃុំជ្រៃវៀន", "ស្រុកព្រៃឈរ", "ខេត្តកំពង់ចាម", "ស្រុកព្រៃឈរ ខេត្តកំពង់ចាម", "FALSE"],
+      ["s-103", "មុន្នី ច័ន្ទដារ៉ា", "ប្រុស", "2004-08-05", "", "RTTC Kampong Cham", "0889988772", "@dara_rttc", "ភូមិអូរ", "ឃុំតាអុង", "ស្រុកចំការលើ", "ខេត្តកំពង់ចាម", "ស្រុកចំការលើ ខេត្តកំពង់ចាម", "TRUE"]
     ];
     
     const csvContent = BOM + [headers.join(","), ...sampleRows.map(r => r.join(","))].join("\r\n");
@@ -617,6 +637,99 @@ export default function App() {
     }
   };
 
+  const updateAbsenceSession = async (
+    studentId: string,
+    field: "morningAbsent" | "afternoonAbsent",
+    value: boolean
+  ) => {
+    const todayStr = selectedDate;
+    const recordId = `${studentId}-${todayStr}`;
+    const existing = attendance.find(r => r.id === recordId);
+    const nextMorningAbsent = field === "morningAbsent" ? value : !!existing?.morningAbsent;
+    const nextAfternoonAbsent = field === "afternoonAbsent" ? value : !!existing?.afternoonAbsent;
+    const nextStatus: AttendanceStatus = (nextMorningAbsent || nextAfternoonAbsent) ? "Absent_No_Permission" : "Present";
+
+    const updatedRecord: AttendanceRecord = {
+      id: recordId,
+      studentId,
+      date: todayStr,
+      status: nextStatus,
+      checkInTime: nextStatus === "Present" ? (existing?.checkInTime || "07:15 AM") : "",
+      verifiedByQR: existing?.verifiedByQR || false,
+      latitude: existing?.latitude,
+      longitude: existing?.longitude,
+      morningAbsent: nextMorningAbsent,
+      afternoonAbsent: nextAfternoonAbsent,
+      absenceNote: existing?.absenceNote || ""
+    };
+
+    try {
+      await setDoc(doc(db, "attendance", recordId), removeUndefinedFields(updatedRecord), { merge: true });
+      setAttendance(prev => {
+        const exists = prev.some(r => r.id === recordId);
+        if (exists) {
+          return prev.map(r => r.id === recordId ? { ...r, ...updatedRecord } : r);
+        }
+        return [...prev, updatedRecord];
+      });
+      triggerToast(lang === "km" ? "បានកត់ត្រាពេលអវត្តមានរួចរាល់" : "Absence session updated");
+    } catch (error) {
+      console.error("Error updating absence session:", error);
+      triggerToast(lang === "km" ? "មានបញ្ហាក្នុងការកត់ត្រាអវត្តមាន" : "Error updating absence session");
+    }
+  };
+
+  const updateAbsenceNoteLocal = (studentId: string, note: string) => {
+    const todayStr = selectedDate;
+    const recordId = `${studentId}-${todayStr}`;
+    setAttendance(prev => {
+      const existing = prev.find(r => r.id === recordId);
+      if (existing) {
+        return prev.map(r => r.id === recordId ? { ...r, absenceNote: note } : r);
+      }
+      return [
+        ...prev,
+        {
+          id: recordId,
+          studentId,
+          date: todayStr,
+          status: "Absent_No_Permission",
+          verifiedByQR: false,
+          morningAbsent: false,
+          afternoonAbsent: false,
+          absenceNote: note
+        }
+      ];
+    });
+  };
+
+  const saveAbsenceNote = async (studentId: string, note: string) => {
+    const todayStr = selectedDate;
+    const recordId = `${studentId}-${todayStr}`;
+    const existing = attendance.find(r => r.id === recordId);
+    const updatedRecord: AttendanceRecord = {
+      id: recordId,
+      studentId,
+      date: todayStr,
+      status: existing?.status || "Absent_No_Permission",
+      checkInTime: existing?.checkInTime,
+      verifiedByQR: existing?.verifiedByQR || false,
+      latitude: existing?.latitude,
+      longitude: existing?.longitude,
+      morningAbsent: !!existing?.morningAbsent,
+      afternoonAbsent: !!existing?.afternoonAbsent,
+      absenceNote: note
+    };
+
+    try {
+      await setDoc(doc(db, "attendance", recordId), removeUndefinedFields(updatedRecord), { merge: true });
+      triggerToast(lang === "km" ? "បានរក្សាទុកចំណាំអវត្តមាន" : "Absence note saved");
+    } catch (error) {
+      console.error("Error saving absence note:", error);
+      triggerToast(lang === "km" ? "មានបញ្ហាក្នុងការរក្សាទុកចំណាំ" : "Error saving absence note");
+    }
+  };
+
   // --- កែប្រែ៖ មុខងារកំណត់មានវត្តមានទាំងអស់ រុញទៅ Cloud តាម Batch ---
   const setAllToPresent = async () => {
     const todayStr = selectedDate;
@@ -626,11 +739,15 @@ export default function App() {
         const recordId = `${st.id}-${todayStr}`;
         const recordRef = doc(db, "attendance", recordId);
         batch.set(recordRef, removeUndefinedFields({
+          id: recordId,
           studentId: st.id,
           date: todayStr,
           status: "Present",
           checkInTime: "07:15 AM",
-          verifiedByQR: false
+          verifiedByQR: false,
+          morningAbsent: false,
+          afternoonAbsent: false,
+          absenceNote: ""
         }));
       });
       await batch.commit();
@@ -638,6 +755,19 @@ export default function App() {
     } catch (error) {
       console.error("Error setting all present:", error);
     }
+  };
+
+  const getStudentFullAddress = (student: Partial<Student>) => {
+    const detailedAddress = [student.village, student.commune, student.district, student.province]
+      .filter(Boolean)
+      .join(" ");
+    return detailedAddress || student.address || "";
+  };
+
+  const getStudentInitials = (name: string) => {
+    const cleanName = name.trim();
+    if (!cleanName) return "ST";
+    return cleanName.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
   };
 
   // Get active student records with attendance statuses merged
@@ -649,7 +779,10 @@ export default function App() {
         ...st,
         status: record ? record.status : ("Present" as AttendanceStatus),
         checkInTime: record ? record.checkInTime || undefined : undefined,
-        verifiedByQR: record ? !!record.verifiedByQR : false
+        verifiedByQR: record ? !!record.verifiedByQR : false,
+        morningAbsent: record ? !!record.morningAbsent : false,
+        afternoonAbsent: record ? !!record.afternoonAbsent : false,
+        absenceNote: record ? record.absenceNote || "" : ""
       };
     });
   };
@@ -658,12 +791,21 @@ export default function App() {
   const listToday = getDailyStatusList();
   const filteredList = listToday.filter(st => {
     const query = searchQuery.toLowerCase();
+    const fullAddress = getStudentFullAddress(st).toLowerCase();
     return (
       st.name.toLowerCase().includes(query) ||
       st.phoneNumber.includes(query) ||
-      st.address.toLowerCase().includes(query) ||
-      st.telegram.toLowerCase().includes(query)
+      fullAddress.includes(query) ||
+      (st.address || "").toLowerCase().includes(query) ||
+      (st.schoolName || "").toLowerCase().includes(query) ||
+      (st.telegram || "").toLowerCase().includes(query)
     );
+  });
+
+  const filteredStudentsInfo = students.filter(st => {
+    const query = studentInfoSearch.toLowerCase().trim();
+    if (!query) return true;
+    return st.name.toLowerCase().includes(query);
   });
 
   const totalCount = students.length;
@@ -763,27 +905,45 @@ export default function App() {
       lang === "km" ? "ឈ្មោះនិស្សិត" : "Student Name",
       lang === "km" ? "ភេទ" : "Gender",
       lang === "km" ? "ថ្ងៃខែឆ្នាំកំណើត" : "Date of Birth",
+      lang === "km" ? "ឈ្មោះសាលា" : "School Name",
       lang === "km" ? "លេខទូរស័ព្ទ" : "Phone Number",
       lang === "km" ? "គណនី Telegram" : "Telegram",
+      lang === "km" ? "ភូមិ" : "Village",
+      lang === "km" ? "ឃុំ" : "Commune",
+      lang === "km" ? "ស្រុក" : "District",
+      lang === "km" ? "ខេត្ត" : "Province",
       lang === "km" ? "អាសយដ្ឋានបច្ចុប្បន្ន" : "Current Address",
       lang === "km" ? "ស្ថានភាពវត្តមាន" : "Attendance Status",
+      lang === "km" ? "អវត្តមានព្រឹក" : "Morning Absent",
+      lang === "km" ? "អវត្តមានរសៀល" : "Afternoon Absent",
+      lang === "km" ? "ចំណាំអវត្តមាន" : "Absence Note",
       lang === "km" ? "ម៉ោងមកដល់" : "Arrival Time",
       lang === "km" ? "ផ្ទៀងផ្ទាត់ទីតាំង QR" : "QR Verified"
     ];
 
+    const quoteCSV = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+
     const rows = filteredList.map((st, i) => [
       i + 1,
-      st.name,
+      quoteCSV(st.name),
       st.gender,
       st.dob,
+      quoteCSV(st.schoolName || ""),
       st.phoneNumber,
-      st.telegram,
-      `"${st.address.replace(/"/g, '""')}"`,
+      quoteCSV(st.telegram),
+      quoteCSV(st.village || ""),
+      quoteCSV(st.commune || ""),
+      quoteCSV(st.district || ""),
+      quoteCSV(st.province || ""),
+      quoteCSV(getStudentFullAddress(st)),
       st.status === "Present" 
         ? (lang === "km" ? "មានវត្តមាន" : "Present") 
         : st.status === "Absent_Permission" 
           ? (lang === "km" ? "ច្បាប់" : "Absent Excused") 
           : (lang === "km" ? "ឥតច្បាប់" : "Absent Unexcused"),
+      st.morningAbsent ? "YES" : "NO",
+      st.afternoonAbsent ? "YES" : "NO",
+      quoteCSV(st.absenceNote || ""),
       st.checkInTime || "-",
       st.verifiedByQR ? "YES" : "NO"
     ]);
@@ -1147,7 +1307,8 @@ export default function App() {
     );
   };
 
-  const isAllStudentsSelected = students.length > 0 && selectedStudentIds.length === students.length;
+  const visibleStudentIds = filteredStudentsInfo.map(st => st.id);
+  const isAllStudentsSelected = visibleStudentIds.length > 0 && visibleStudentIds.every(id => selectedStudentIds.includes(id));
 
   const toggleStudentSelection = (id: string) => {
     setSelectedStudentIds(prev =>
@@ -1156,13 +1317,18 @@ export default function App() {
   };
 
   const toggleSelectAllStudents = () => {
-    setSelectedStudentIds(isAllStudentsSelected ? [] : students.map(st => st.id));
+    if (isAllStudentsSelected) {
+      setSelectedStudentIds(prev => prev.filter(id => !visibleStudentIds.includes(id)));
+    } else {
+      setSelectedStudentIds(prev => Array.from(new Set([...prev, ...visibleStudentIds])));
+    }
   };
 
   // Student Admin Form Submission
   const handleSaveStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!studentForm.name || !studentForm.phoneNumber || !studentForm.address) {
+    const combinedAddress = getStudentFullAddress(studentForm);
+    if (!studentForm.name || !studentForm.phoneNumber || !combinedAddress) {
       triggerToast(t.toastFieldsRequired);
       return;
     }
@@ -1171,7 +1337,7 @@ export default function App() {
       try {
         if (editingStudentId) {
           // Edit mode
-          const updatedStudent: Student = { id: editingStudentId, ...studentForm };
+          const updatedStudent: Student = { id: editingStudentId, ...studentForm, address: studentForm.address || getStudentFullAddress(studentForm) };
           await setDoc(doc(db, "students", editingStudentId), removeUndefinedFields(updatedStudent));
           const updated = students.map(s => s.id === editingStudentId ? updatedStudent : s);
           setStudents(updated);
@@ -1181,7 +1347,8 @@ export default function App() {
           // Add mode
           const newStudent: Student = {
             id: `s-${Date.now()}`,
-            ...studentForm
+            ...studentForm,
+            address: studentForm.address || getStudentFullAddress(studentForm)
           };
           await setDoc(doc(db, "students", newStudent.id), removeUndefinedFields(newStudent));
           setStudents([...students, newStudent]);
@@ -1189,15 +1356,7 @@ export default function App() {
         }
 
         // Reset Form
-        setStudentForm({
-          name: "",
-          gender: "ប្រុស",
-          dob: "2004-01-01",
-          address: "",
-          phoneNumber: "",
-          telegram: "",
-          isMonitor: false
-        });
+        setStudentForm(emptyStudentForm);
         setShowAddForm(false);
       } catch (error) {
         console.error("Error saving student to Cloud:", error);
@@ -1231,7 +1390,13 @@ export default function App() {
       name: student.name,
       gender: student.gender,
       dob: student.dob,
-      address: student.address,
+      profilePhoto: student.profilePhoto || "",
+      schoolName: student.schoolName || "",
+      address: student.address || "",
+      village: student.village || "",
+      commune: student.commune || "",
+      district: student.district || "",
+      province: student.province || "",
       phoneNumber: student.phoneNumber,
       telegram: student.telegram,
       isMonitor: !!student.isMonitor
@@ -2240,10 +2405,18 @@ export default function App() {
                     className="p-4 rounded-2xl border border-slate-150 hover:border-slate-250 bg-white/80 hover:bg-slate-50/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
                   >
                     <div className="flex items-center gap-3">
-                      {/* Avatar initial or sequence index */}
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs uppercase ${st.isMonitor ? "bg-amber-100 text-amber-800 border-2 border-amber-300" : "bg-slate-100 text-slate-600"}`}>
-                        {st.isMonitor ? "MON" : (i+1).toString().padStart(2, "0")}
-                      </div>
+                      {/* Avatar / profile photo */}
+                      {st.profilePhoto ? (
+                        <img
+                          src={st.profilePhoto}
+                          alt={st.name}
+                          className={`w-10 h-10 rounded-full object-cover border-2 ${st.isMonitor ? "border-amber-300" : "border-slate-200"}`}
+                        />
+                      ) : (
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs uppercase ${st.isMonitor ? "bg-amber-100 text-amber-800 border-2 border-amber-300" : "bg-slate-100 text-slate-600"}`}>
+                          {st.isMonitor ? "MON" : (i+1).toString().padStart(2, "0")}
+                        </div>
+                      )}
 
                       <div>
                         <div className="flex items-center gap-2">
@@ -2267,6 +2440,10 @@ export default function App() {
                           <span className="text-slate-300">|</span>
                           <span className="font-sans italic">
                             Telegram: <strong className="text-slate-500 font-semibold">{st.telegram}</strong>
+                          </span>
+                          <span className="text-slate-300">|</span>
+                          <span className="font-sans italic">
+                            {lang === "km" ? "សាលា" : "School"}: <strong className="text-slate-500 font-semibold">{st.schoolName || "-"}</strong>
                           </span>
                         </div>
                       </div>
@@ -2311,6 +2488,37 @@ export default function App() {
                           </>
                         )}
                       </button>
+                    </div>
+
+                    <div className="w-full sm:w-[260px] rounded-2xl border border-slate-100 bg-slate-50/70 p-3 space-y-2 text-xs">
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className={`flex items-center gap-2 font-bold rounded-xl border px-2 py-2 cursor-pointer ${st.morningAbsent ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-white border-slate-200 text-slate-600"}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!st.morningAbsent}
+                            onChange={(e) => updateAbsenceSession(st.id, "morningAbsent", e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                          />
+                          {lang === "km" ? "ព្រឹក" : "Morning"}
+                        </label>
+                        <label className={`flex items-center gap-2 font-bold rounded-xl border px-2 py-2 cursor-pointer ${st.afternoonAbsent ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-white border-slate-200 text-slate-600"}`}>
+                          <input
+                            type="checkbox"
+                            checked={!!st.afternoonAbsent}
+                            onChange={(e) => updateAbsenceSession(st.id, "afternoonAbsent", e.target.checked)}
+                            className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                          />
+                          {lang === "km" ? "រសៀល" : "Afternoon"}
+                        </label>
+                      </div>
+                      <input
+                        type="text"
+                        value={st.absenceNote || ""}
+                        onChange={(e) => updateAbsenceNoteLocal(st.id, e.target.value)}
+                        onBlur={(e) => saveAbsenceNote(st.id, e.target.value)}
+                        placeholder={lang === "km" ? "ចំណាំអវត្តមាន..." : "Absence note..."}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:border-emerald-500"
+                      />
                     </div>
 
                   </div>
@@ -2416,15 +2624,7 @@ export default function App() {
                 <button
                   onClick={() => {
                     setEditingStudentId(null);
-                    setStudentForm({
-                      name: "",
-                      gender: "ប្រុស",
-                      dob: "2004-01-01",
-                      address: "",
-                      phoneNumber: "",
-                      telegram: "",
-                      isMonitor: false
-                    });
+                    setStudentForm(emptyStudentForm);
                     setShowAddForm(true);
                   }}
                   className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all hover:scale-[1.02] active:scale-95"
@@ -2459,6 +2659,19 @@ export default function App() {
               </div>
             </div>
 
+            <div className="relative w-full sm:max-w-md">
+              <label htmlFor="student-info-search" className="sr-only">Search student's name</label>
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+              <input
+                id="student-info-search"
+                type="text"
+                value={studentInfoSearch}
+                onChange={(e) => setStudentInfoSearch(e.target.value)}
+                placeholder={lang === "km" ? "ស្វែងរកឈ្មោះសិស្ស..." : "Search student's name..."}
+                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 transition-all text-slate-800"
+              />
+            </div>
+
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
               <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
                 <input
@@ -2471,8 +2684,8 @@ export default function App() {
               </label>
               <div className="text-[11px] font-semibold text-slate-500">
                 {lang === "km"
-                  ? `បានជ្រើសរើស ${selectedStudentIds.length} / ${students.length} នាក់`
-                  : `${selectedStudentIds.length} / ${students.length} selected`}
+                  ? `បានជ្រើសរើស ${selectedStudentIds.length} / ${filteredStudentsInfo.length} នាក់ដែលកំពុងបង្ហាញ`
+                  : `${selectedStudentIds.length} selected / ${filteredStudentsInfo.length} visible`}
               </div>
             </div>
 
@@ -2534,6 +2747,34 @@ export default function App() {
                             placeholder={lang === "km" ? "ឧ. សុខ មករា" : "e.g., Sok Makara"}
                             value={studentForm.name}
                             onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                        </div>
+
+                        <div>
+                          <label htmlFor="form-profile-photo" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                            {lang === "km" ? "រូបភាព Profile" : "Profile Photo"}
+                          </label>
+                          <input
+                            id="form-profile-photo"
+                            type="url"
+                            placeholder={lang === "km" ? "URL រូបភាពសិស្ស" : "Student photo URL"}
+                            value={studentForm.profilePhoto || ""}
+                            onChange={(e) => setStudentForm({ ...studentForm, profilePhoto: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                        </div>
+
+                        <div>
+                          <label htmlFor="form-school-name" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
+                            {lang === "km" ? "ឈ្មោះសាលា" : "School Name"}
+                          </label>
+                          <input
+                            id="form-school-name"
+                            type="text"
+                            placeholder={lang === "km" ? "ឧ. វិទ្យាល័យកំពង់ចាម" : "e.g., Kampong Cham High School"}
+                            value={studentForm.schoolName || ""}
+                            onChange={(e) => setStudentForm({ ...studentForm, schoolName: e.target.value })}
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
                           />
                         </div>
@@ -2610,15 +2851,55 @@ export default function App() {
 
                       </div>
 
+                      <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                        <div>
+                          <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wide">
+                            {lang === "km" ? "អាសយដ្ឋានដាច់ដោយឡែក" : "Separated Address"} *
+                          </h4>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            {lang === "km" ? "បំពេញ ភូមិ / ឃុំ / ស្រុក / ខេត្ត ដើម្បីងាយស្វែងរក និងរាយការណ៍" : "Fill village / commune / district / province for cleaner reports."}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <input
+                            type="text"
+                            placeholder={lang === "km" ? "ភូមិ" : "Village"}
+                            value={studentForm.village || ""}
+                            onChange={(e) => setStudentForm({ ...studentForm, village: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                          <input
+                            type="text"
+                            placeholder={lang === "km" ? "ឃុំ / សង្កាត់" : "Commune"}
+                            value={studentForm.commune || ""}
+                            onChange={(e) => setStudentForm({ ...studentForm, commune: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                          <input
+                            type="text"
+                            placeholder={lang === "km" ? "ស្រុក / ក្រុង" : "District"}
+                            value={studentForm.district || ""}
+                            onChange={(e) => setStudentForm({ ...studentForm, district: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                          <input
+                            type="text"
+                            placeholder={lang === "km" ? "ខេត្ត" : "Province"}
+                            value={studentForm.province || ""}
+                            onChange={(e) => setStudentForm({ ...studentForm, province: e.target.value })}
+                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <label htmlFor="form-addr" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                          {t.currentAddress} *
+                          {lang === "km" ? "អាសយដ្ឋានសរុប / បន្ថែម" : "Full / Extra Address"}
                         </label>
                         <textarea 
                           id="form-addr"
                           rows={2}
-                          required
-                          placeholder={lang === "km" ? "ឧ. ភូមិវាល ឃុំព្រៃឈរ ស្រុកព្រៃឈរ ខេត្តកំពង់ចាម" : "e.g., Veal village, Kampong Cham province"}
+                          placeholder={lang === "km" ? "ឧ. ផ្ទះលេខ..., ផ្លូវ..., ឬអាសយដ្ឋានពេញ" : "House no., street, or complete address"}
                           value={studentForm.address}
                           onChange={(e) => setStudentForm({ ...studentForm, address: e.target.value })}
                           className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans resize-none"
@@ -2650,7 +2931,7 @@ export default function App() {
             {/* Student list grid with editable properties */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="roster-grid">
               
-              {students.map((st) => (
+              {filteredStudentsInfo.map((st) => (
                 <div 
                   key={st.id} 
                   className={`border rounded-2xl p-5 shadow-xs transition-all duration-300 hover:shadow-md hover:scale-[1.02] hover:-translate-y-0.5 ${
@@ -2662,24 +2943,36 @@ export default function App() {
                   }`}
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
                       <input
                         type="checkbox"
                         checked={selectedStudentIds.includes(st.id)}
                         onChange={() => toggleStudentSelection(st.id)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer shrink-0"
                         aria-label={lang === "km" ? `ជ្រើសរើស ${st.name}` : `Select ${st.name}`}
                       />
-                      <div>
-                      <h4 className="font-extrabold text-[#0f172a] text-base font-sans flex items-center gap-1.5">
-                        {st.name}
-                        {st.isMonitor && (
-                          <span className="text-[10px] uppercase font-bold bg-[#f59e0b] text-slate-950 px-1.5 py-0.5 rounded-sm">
-                            {lang === "km" ? "ប្រធាន" : "Monitor"}
-                          </span>
-                        )}
-                      </h4>
-                      <span className="text-[11px] text-slate-400 font-mono mt-0.5 block italic">{lang === "km" ? "ថ្ងៃខែឆ្នាំកំណើត៖" : "DOB:"} {st.dob}</span>
+                      {st.profilePhoto ? (
+                        <img
+                          src={st.profilePhoto}
+                          alt={st.name}
+                          className="w-12 h-12 rounded-2xl object-cover border border-slate-200 bg-slate-100 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-slate-100 border border-slate-200 text-emerald-700 flex items-center justify-center text-xs font-extrabold shrink-0">
+                          {getStudentInitials(st.name)}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <h4 className="font-extrabold text-[#0f172a] text-base font-sans flex items-center gap-1.5 flex-wrap">
+                          {st.name}
+                          {st.isMonitor && (
+                            <span className="text-[10px] uppercase font-bold bg-[#f59e0b] text-slate-950 px-1.5 py-0.5 rounded-sm">
+                              {lang === "km" ? "ប្រធាន" : "Monitor"}
+                            </span>
+                          )}
+                        </h4>
+                        <span className="text-[11px] text-slate-400 font-mono mt-0.5 block italic">{lang === "km" ? "ថ្ងៃខែឆ្នាំកំណើត៖" : "DOB:"} {st.dob}</span>
+                        <span className="text-[11px] text-emerald-700 font-bold mt-1 block truncate">{st.schoolName || (lang === "km" ? "មិនទាន់បញ្ចូលឈ្មោះសាលា" : "No school name")}</span>
                       </div>
                     </div>
 
@@ -2714,17 +3007,29 @@ export default function App() {
                       <span>Telegram:</span>
                       <strong className="text-[#3b82f6] font-semibold">{st.telegram}</strong>
                     </div>
-                    <div className="pt-2 border-t border-slate-50 leading-snug">
-                      <span className="text-slate-400 block text-[10px] uppercase tracking-wide font-bold mb-0.5">{t.currentAddress}</span>
-                      <p className="text-slate-700 italic">{st.address}</p>
+                    <div className="flex justify-between gap-3">
+                      <span>{lang === "km" ? "ឈ្មោះសាលា:" : "School:"}</span>
+                      <strong className="text-slate-900 font-semibold text-right">{st.schoolName || "-"}</strong>
+                    </div>
+                    <div className="pt-2 border-t border-slate-50 leading-snug space-y-1">
+                      <span className="text-slate-400 block text-[10px] uppercase tracking-wide font-bold mb-0.5">{lang === "km" ? "អាសយដ្ឋានលម្អិត" : "Detailed Address"}</span>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-600 not-italic">
+                        <span>{lang === "km" ? "ភូមិ:" : "Village:"} <strong className="text-slate-800">{st.village || "-"}</strong></span>
+                        <span>{lang === "km" ? "ឃុំ:" : "Commune:"} <strong className="text-slate-800">{st.commune || "-"}</strong></span>
+                        <span>{lang === "km" ? "ស្រុក:" : "District:"} <strong className="text-slate-800">{st.district || "-"}</strong></span>
+                        <span>{lang === "km" ? "ខេត្ត:" : "Province:"} <strong className="text-slate-800">{st.province || "-"}</strong></span>
+                      </div>
+                      <p className="text-slate-700 italic">{getStudentFullAddress(st) || "-"}</p>
                     </div>
                   </div>
                 </div>
               ))}
 
-              {students.length === 0 && (
+              {filteredStudentsInfo.length === 0 && (
                 <div className="col-span-full text-center py-16 text-slate-400 italic">
-                  No students active in Class R01 configuration. Click Add student above.
+                  {studentInfoSearch
+                    ? (lang === "km" ? "រកមិនឃើញឈ្មោះសិស្សដែលបានស្វែងរកទេ។" : "No students match your search.")
+                    : "No students active in Class R01 configuration. Click Add student above."}
                 </div>
               )}
 
@@ -3069,8 +3374,11 @@ export default function App() {
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-32">{t.colDOB}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36">{t.colPhone}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36">{t.colTelegram}</th>
+                    <th scope="col" className="px-4 py-3 border-r border-slate-200 w-40">{lang === "km" ? "ឈ្មោះសាលា" : "School"}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200">{t.colAddress}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36 text-center">{t.colStatus}</th>
+                    <th scope="col" className="px-4 py-3 border-r border-slate-200 w-32 text-center">{lang === "km" ? "ព្រឹក/រសៀល" : "AM/PM"}</th>
+                    <th scope="col" className="px-4 py-3 border-r border-slate-200 w-48">{lang === "km" ? "ចំណាំ" : "Note"}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-28 text-center">{t.colTime}</th>
                     <th scope="col" className="px-4 py-3 text-center w-28">{t.colVerification}</th>
                   </tr>
@@ -3097,7 +3405,8 @@ export default function App() {
                       <td className="px-4 py-2.5 border-r border-slate-200 font-mono text-slate-600">{st.dob}</td>
                       <td className="px-4 py-2.5 border-r border-slate-200 font-mono text-slate-900">{st.phoneNumber}</td>
                       <td className="px-4 py-2.5 border-r border-slate-200 text-slate-500 font-bold font-mono">{st.telegram}</td>
-                      <td className="px-4 py-2.5 border-r border-slate-200 italic max-w-sm truncate text-slate-500" title={st.address}>{st.address}</td>
+                      <td className="px-4 py-2.5 border-r border-slate-200 text-slate-700 font-semibold max-w-xs truncate" title={st.schoolName || ""}>{st.schoolName || "-"}</td>
+                      <td className="px-4 py-2.5 border-r border-slate-200 italic max-w-sm truncate text-slate-500" title={getStudentFullAddress(st)}>{getStudentFullAddress(st)}</td>
                       
                       {/* Interactive Sheet cell status switcher */}
                       <td className="px-4 py-2.5 border-r border-slate-200 text-center font-bold">
@@ -3145,6 +3454,17 @@ export default function App() {
                           <option value="Absent_Permission">{lang === "km" ? "ច្បាប់" : "Leave"}</option>
                           <option value="Absent_No_Permission">{lang === "km" ? "អវត្តមាន" : "Unexcused"}</option>
                         </select>
+                      </td>
+
+                      <td className="px-4 py-2.5 border-r border-slate-200 text-center text-[10px] font-bold">
+                        <div className="flex flex-col gap-1">
+                          <span className={st.morningAbsent ? "text-rose-600" : "text-slate-400"}>{lang === "km" ? "ព្រឹក" : "AM"}: {st.morningAbsent ? "✓" : "-"}</span>
+                          <span className={st.afternoonAbsent ? "text-rose-600" : "text-slate-400"}>{lang === "km" ? "រសៀល" : "PM"}: {st.afternoonAbsent ? "✓" : "-"}</span>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-2.5 border-r border-slate-200 text-slate-500 max-w-xs truncate" title={st.absenceNote || ""}>
+                        {st.absenceNote || "-"}
                       </td>
 
                       <td className="px-4 py-2.5 border-r border-slate-200 text-center text-slate-800 font-mono font-bold">
