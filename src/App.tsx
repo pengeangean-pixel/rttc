@@ -411,7 +411,7 @@ export default function App() {
       const phoneNumber = getVal(["phone", "ទូរស័ព្ទ", "លេខទូរស័ព្ទ", "tel"]) || "096";
       const telegram = getVal(["telegram", "តេឡេក្រាម", "គណនី", "username", "tg"]) || "";
       const profilePhoto = getVal(["profile", "photo", "image", "រូបភាព", "រូបថត"]);
-      const schoolName = getVal(["school", "school name", "ឈ្មោះសាលា", "សាលា"]);
+      const schoolName = getVal(["school", "school name", "ឈ្មោះសាលាកំពុងបង្រៀនកំពុងបង្រៀន", "សាលា"]);
       const village = getVal(["village", "ភូមិ"]);
       const commune = getVal(["commune", "ឃុំ", "សង្កាត់"]);
       const district = getVal(["district", "ស្រុក", "ក្រុង", "ខណ្ឌ"]);
@@ -992,7 +992,7 @@ export default function App() {
       lang === "km" ? "ឈ្មោះនិស្សិត" : "Student Name",
       lang === "km" ? "ភេទ" : "Gender",
       lang === "km" ? "ថ្ងៃខែឆ្នាំកំណើត" : "Date of Birth",
-      lang === "km" ? "ឈ្មោះសាលា" : "School Name",
+      lang === "km" ? "ឈ្មោះសាលាកំពុងបង្រៀន" : "School Name",
       lang === "km" ? "លេខទូរស័ព្ទ" : "Phone Number",
       lang === "km" ? "គណនី Telegram" : "Telegram",
       lang === "km" ? "ភូមិ" : "Village",
@@ -2886,7 +2886,7 @@ export default function App() {
 
                         <div>
                           <label htmlFor="form-school-name" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                            {lang === "km" ? "ឈ្មោះសាលា" : "School Name"}
+                            {lang === "km" ? "ឈ្មោះសាលាកំពុងបង្រៀន" : "School Name"}
                           </label>
                           <input
                             id="form-school-name"
@@ -3127,7 +3127,7 @@ export default function App() {
                       <strong className="text-[#3b82f6] font-semibold">{st.telegram}</strong>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <span>{lang === "km" ? "ឈ្មោះសាលា:" : "School:"}</span>
+                      <span>{lang === "km" ? "ឈ្មោះសាលាកំពុងបង្រៀន:" : "School:"}</span>
                       <strong className="text-slate-900 font-semibold text-right">{st.schoolName || "-"}</strong>
                     </div>
                     <div className="pt-2 border-t border-slate-50 leading-snug space-y-1">
@@ -3493,7 +3493,7 @@ export default function App() {
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-32">{t.colDOB}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36">{t.colPhone}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36">{t.colTelegram}</th>
-                    <th scope="col" className="px-4 py-3 border-r border-slate-200 w-40">{lang === "km" ? "ឈ្មោះសាលា" : "School"}</th>
+                    <th scope="col" className="px-4 py-3 border-r border-slate-200 w-40">{lang === "km" ? "ឈ្មោះសាលាកំពុងបង្រៀន" : "School"}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200">{t.colAddress}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36 text-center">{t.colStatus}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-32 text-center">{lang === "km" ? "ព្រឹក/រសៀល" : "AM/PM"}</th>
