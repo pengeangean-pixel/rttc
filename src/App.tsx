@@ -2970,7 +2970,7 @@ export default function App() {
                       <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                         <div>
                           <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wide">
-                            {lang === "km" ? "អាសយដ្ឋានដាច់ដោយឡែក" : "Separated Address"} *
+                            {lang === "km" ? "អាសយដ្ឋានបច្ចុប្បន្ន" : "Home Address"}
                           </h4>
                           <p className="text-[10px] text-slate-400 mt-0.5">
                             {lang === "km" ? "បំពេញ ភូមិ / ឃុំ / ស្រុក / ខេត្ត ដើម្បីងាយស្វែងរក និងរាយការណ៍" : "Fill village / commune / district / province for cleaner reports."}
@@ -3010,12 +3010,12 @@ export default function App() {
 
                       <div>
                         <label htmlFor="form-addr" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                          {lang === "km" ? "អាសយដ្ឋានសាលាកំពុងបង្រៀន" : "Full / Extra Address"}
+                          {lang === "km" ? "អាសយដ្ឋានសាលាកំពុងបង្រៀន" : "School Address"}
                         </label>
                         <textarea 
                           id="form-addr"
                           rows={2}
-                          placeholder={lang === "km" ? "ឧ. ផ្ទះលេខ..., ផ្លូវ..., ឬអាសយដ្ឋានពេញ" : "House no., street, or complete address"}
+                          placeholder={lang === "km" ? "ភូមិ ឃុំ ស្រុក ខេត្ត" : "House no., street, or complete address"}
                           value={studentForm.address}
                           onChange={(e) => setStudentForm({ ...studentForm, address: e.target.value })}
                           className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans resize-none"
