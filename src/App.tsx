@@ -8,7 +8,7 @@ import {
   deleteDoc, 
   writeBatch 
 } from "firebase/firestore";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   EmailAuthProvider,
   User as FirebaseUser,
@@ -61,7 +61,9 @@ import {
   Mail,
   Key,
   RefreshCw,
-  ArrowLeft
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Student, AttendanceRecord, GeofenceConfig, AttendanceStatus } from "./types";
 import { translations } from "./translations_rttc";
@@ -131,6 +133,233 @@ const resizeProfilePhotoToDataUrl = (file: File): Promise<string> => {
 
     img.src = objectUrl;
   });
+};
+
+
+const KHMER_MONTHS = [
+  "មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា",
+  "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"
+];
+
+const EN_MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+const WEEKDAY_LABELS = {
+  km: ["ច", "អ", "ព", "ព្រ", "សុ", "ស", "អា"],
+  en: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+};
+
+const padDateNumber = (value: number) => String(value).padStart(2, "0");
+
+const toLocalISODate = (date: Date) => {
+  return `${date.getFullYear()}-${padDateNumber(date.getMonth() + 1)}-${padDateNumber(date.getDate())}`;
+};
+
+const parseISODate = (dateString: string) => {
+  const [year, month, day] = dateString.split("-").map(Number);
+  if (!year || !month || !day) return new Date();
+  return new Date(year, month - 1, day);
+};
+
+const formatDisplayDate = (dateString: string, lang: "km" | "en") => {
+  if (!dateString) return "";
+  const date = parseISODate(dateString);
+  const day = padDateNumber(date.getDate());
+  const month = padDateNumber(date.getMonth() + 1);
+  const year = date.getFullYear();
+  return lang === "km" ? `${day}/${month}/${year}` : `${month}/${day}/${year}`;
+};
+
+type PremiumDatePickerProps = {
+  id?: string;
+  value: string;
+  onChange: (value: string) => void;
+  lang: "km" | "en";
+  placeholder?: string;
+  className?: string;
+  allowClear?: boolean;
+};
+
+const PremiumDatePicker = ({
+  id,
+  value,
+  onChange,
+  lang,
+  placeholder,
+  className = "",
+  allowClear = false
+}: PremiumDatePickerProps) => {
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const selectedDate = value ? parseISODate(value) : new Date();
+  const [isOpen, setIsOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+
+  useEffect(() => {
+    if (value) {
+      const next = parseISODate(value);
+      setVisibleMonth(new Date(next.getFullYear(), next.getMonth(), 1));
+    }
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const today = new Date();
+  const todayISO = toLocalISODate(today);
+  const selectedISO = value;
+  const monthNames = lang === "km" ? KHMER_MONTHS : EN_MONTHS;
+  const monthStart = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+  const mondayOffset = (monthStart.getDay() + 6) % 7;
+  const gridStart = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1 - mondayOffset);
+
+  const days = Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(gridStart);
+    day.setDate(gridStart.getDate() + index);
+    return day;
+  });
+
+  const changeMonth = (amount: number) => {
+    setVisibleMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + amount, 1));
+  };
+
+  const selectDate = (date: Date) => {
+    onChange(toLocalISODate(date));
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        id={id}
+        type="button"
+        onClick={() => setIsOpen(prev => !prev)}
+        className={`group flex w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-left text-sm font-semibold text-slate-800 shadow-sm transition-all hover:border-emerald-400 hover:shadow-md focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 ${className}`}
+      >
+        <span className={value ? "text-slate-800" : "text-slate-400"}>
+          {value ? formatDisplayDate(value, lang) : (placeholder || (lang === "km" ? "ជ្រើសរើសថ្ងៃខែ" : "Select date"))}
+        </span>
+        <Calendar className="h-4 w-4 text-slate-400 transition-colors group-hover:text-emerald-600" />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: "easeOut" }}
+            className="absolute left-0 top-full z-[9999] mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5"
+          >
+            <div className="bg-gradient-to-br from-emerald-600 via-teal-600 to-slate-900 px-4 py-4 text-white">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-100">
+                    {lang === "km" ? "ប្រតិទិន" : "Calendar"}
+                  </p>
+                  <h4 className="mt-1 text-lg font-black leading-none">
+                    {monthNames[visibleMonth.getMonth()]} {visibleMonth.getFullYear()}
+                  </h4>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => changeMonth(-1)}
+                    className="rounded-xl bg-white/10 p-2 text-white transition hover:bg-white/20"
+                    aria-label={lang === "km" ? "ខែមុន" : "Previous month"}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeMonth(1)}
+                    className="rounded-xl bg-white/10 p-2 text-white transition hover:bg-white/20"
+                    aria-label={lang === "km" ? "ខែបន្ទាប់" : "Next month"}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4">
+              <div className="grid grid-cols-7 gap-1.5 pb-2">
+                {WEEKDAY_LABELS[lang].map(day => (
+                  <div key={day} className="py-1 text-center text-[10px] font-black uppercase tracking-wide text-slate-400">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1.5">
+                {days.map(day => {
+                  const iso = toLocalISODate(day);
+                  const isSelected = iso === selectedISO;
+                  const isToday = iso === todayISO;
+                  const isCurrentMonth = day.getMonth() === visibleMonth.getMonth();
+
+                  return (
+                    <button
+                      key={iso}
+                      type="button"
+                      onClick={() => selectDate(day)}
+                      className={`h-9 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+                        isSelected
+                          ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-200"
+                          : isToday
+                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
+                            : isCurrentMonth
+                              ? "text-slate-700 hover:bg-slate-100"
+                              : "text-slate-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      {day.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(todayISO);
+                    setVisibleMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+                    setIsOpen(false);
+                  }}
+                  className="rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700 transition hover:bg-emerald-100"
+                >
+                  {lang === "km" ? "ថ្ងៃនេះ" : "Today"}
+                </button>
+
+                {allowClear && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChange("");
+                      setIsOpen(false);
+                    }}
+                    className="rounded-xl px-3 py-2 text-[11px] font-black text-slate-500 transition hover:bg-slate-100"
+                  >
+                    {lang === "km" ? "សម្អាត" : "Clear"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 };
 
 export default function App() {
@@ -411,7 +640,7 @@ export default function App() {
       const phoneNumber = getVal(["phone", "ទូរស័ព្ទ", "លេខទូរស័ព្ទ", "tel"]) || "096";
       const telegram = getVal(["telegram", "តេឡេក្រាម", "គណនី", "username", "tg"]) || "";
       const profilePhoto = getVal(["profile", "photo", "image", "រូបភាព", "រូបថត"]);
-      const schoolName = getVal(["school", "school name", "ឈ្មោះសាលាកំពុងបង្រៀនកំពុងបង្រៀន", "សាលា"]);
+      const schoolName = getVal(["school", "school name", "ឈ្មោះសាលា", "សាលា"]);
       const village = getVal(["village", "ភូមិ"]);
       const commune = getVal(["commune", "ឃុំ", "សង្កាត់"]);
       const district = getVal(["district", "ស្រុក", "ក្រុង", "ខណ្ឌ"]);
@@ -992,7 +1221,7 @@ export default function App() {
       lang === "km" ? "ឈ្មោះនិស្សិត" : "Student Name",
       lang === "km" ? "ភេទ" : "Gender",
       lang === "km" ? "ថ្ងៃខែឆ្នាំកំណើត" : "Date of Birth",
-      lang === "km" ? "ឈ្មោះសាលាកំពុងបង្រៀន" : "School Name",
+      lang === "km" ? "ឈ្មោះសាលា" : "School Name",
       lang === "km" ? "លេខទូរស័ព្ទ" : "Phone Number",
       lang === "km" ? "គណនី Telegram" : "Telegram",
       lang === "km" ? "ភូមិ" : "Village",
@@ -1600,14 +1829,14 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-gradient-to-tr from-[#0b0f19]/90 via-[#111827]/85 to-[#064e4b]/40 backdrop-blur-md z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto"
+            className="fixed inset-0 bg-gradient-to-tr from-[#0b0f19]/90 via-[#111827]/85 to-[#064e4b]/40 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto"
           >
             <motion.div
               initial={{ scale: 0.9, y: 30, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0.9, y: 30, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 220 }}
-              className="bg-white rounded-3xl border border-slate-100 max-w-2xl w-full shadow-2xl relative my-0 sm:my-2 font-sans overflow-hidden max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col"
+              className="bg-white rounded-3xl border border-slate-100 max-w-md w-full p-6 shadow-2xl relative space-y-5 overflow-hidden font-sans"
             >
               {/* Highlight gradient line at top */}
               <div className={`absolute top-0 left-0 right-0 h-1.5 ${
@@ -2432,15 +2661,16 @@ export default function App() {
               <label htmlFor="rttc-date-input" className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                 {t.dateLabel}
               </label>
-              <input 
-                id="rttc-date-input"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-1.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
-              />
+              <div className="w-full sm:w-56">
+                <PremiumDatePicker
+                  id="rttc-date-input"
+                  value={selectedDate}
+                  onChange={setSelectedDate}
+                  lang={lang}
+                />
+              </div>
               <button 
-                onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                onClick={() => setSelectedDate(toLocalISODate(new Date()))}
                 className="text-xs text-emerald-600 hover:text-emerald-700 font-bold underline"
               >
                 {t.setToday}
@@ -2783,19 +3013,19 @@ export default function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-gradient-to-tr from-[#0b0f19]/90 via-[#111827]/85 to-[#064e4b]/40 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto"
+                  className="fixed inset-0 bg-gradient-to-tr from-[#0b0f19]/90 via-[#111827]/85 to-[#064e4b]/40 backdrop-blur-md z-50 flex items-start justify-center p-2 sm:p-4 overflow-y-auto"
                 >
                   <motion.div
                     initial={{ scale: 0.95, y: 30, opacity: 0 }}
                     animate={{ scale: 1, y: 0, opacity: 1 }}
                     exit={{ scale: 0.95, y: 30, opacity: 0 }}
                     transition={{ type: "spring", damping: 25, stiffness: 220 }}
-                    className="bg-white rounded-3xl border border-slate-100 max-w-2xl w-full p-6 shadow-2xl relative space-y-5 my-8 font-sans overflow-hidden"
+                    className="bg-white rounded-3xl border border-slate-100 max-w-2xl w-full shadow-2xl relative my-0 sm:my-2 font-sans overflow-hidden max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] flex flex-col"
                   >
                     {/* Top gradient highlight strip */}
                     <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-550" />
 
-                    <div className="flex items-center justify-between border-b border-slate-150 pb-4">
+                    <div className="flex items-center justify-between border-b border-slate-150 px-5 sm:px-6 pt-5 sm:pt-6 pb-4 shrink-0">
                       <div className="flex items-center gap-3">
                         <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl ring-4 ring-emerald-50/50">
                           <UserPlus className="w-6 h-6 animate-pulse" />
@@ -2820,10 +3050,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    <form
-  onSubmit={handleSaveStudent}
-  className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 pb-5 sm:pb-6 space-y-4"
->
+                    <form onSubmit={handleSaveStudent} className="flex-1 min-h-0 overflow-y-auto px-5 sm:px-6 pb-5 sm:pb-6 space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         
                         <div>
@@ -2886,12 +3113,12 @@ export default function App() {
 
                         <div>
                           <label htmlFor="form-school-name" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                            {lang === "km" ? "ឈ្មោះសាលាកំពុងបង្រៀន" : "School Name"}
+                            {lang === "km" ? "ឈ្មោះសាលា" : "School Name"}
                           </label>
                           <input
                             id="form-school-name"
                             type="text"
-                            placeholder={lang === "km" ? "សាលាបឋមសិក្សាប៊ុនរ៉ានីហ៊ុនសែនក្ដុលផ្សារ" : "e.g., Kampong Cham High School"}
+                            placeholder={lang === "km" ? "ឧ. វិទ្យាល័យកំពង់ចាម" : "e.g., Kampong Cham High School"}
                             value={studentForm.schoolName || ""}
                             onChange={(e) => setStudentForm({ ...studentForm, schoolName: e.target.value })}
                             className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
@@ -2917,12 +3144,11 @@ export default function App() {
                           <label htmlFor="form-dob" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
                             {t.dob}
                           </label>
-                          <input 
+                          <PremiumDatePicker
                             id="form-dob"
-                            type="date"
                             value={studentForm.dob}
-                            onChange={(e) => setStudentForm({ ...studentForm, dob: e.target.value })}
-                            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans"
+                            onChange={(value) => setStudentForm({ ...studentForm, dob: value })}
+                            lang={lang}
                           />
                         </div>
 
@@ -2973,7 +3199,7 @@ export default function App() {
                       <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
                         <div>
                           <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wide">
-                            {lang === "km" ? "អាសយដ្ឋានបច្ចុប្បន្ន" : "Home Address"}
+                            {lang === "km" ? "អាសយដ្ឋានដាច់ដោយឡែក" : "Separated Address"} *
                           </h4>
                           <p className="text-[10px] text-slate-400 mt-0.5">
                             {lang === "km" ? "បំពេញ ភូមិ / ឃុំ / ស្រុក / ខេត្ត ដើម្បីងាយស្វែងរក និងរាយការណ៍" : "Fill village / commune / district / province for cleaner reports."}
@@ -3013,19 +3239,19 @@ export default function App() {
 
                       <div>
                         <label htmlFor="form-addr" className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wide">
-                          {lang === "km" ? "អាសយដ្ឋានសាលាកំពុងបង្រៀន" : "School Address"}
+                          {lang === "km" ? "អាសយដ្ឋានសរុប / បន្ថែម" : "Full / Extra Address"}
                         </label>
                         <textarea 
                           id="form-addr"
                           rows={2}
-                          placeholder={lang === "km" ? "ភូមិ ឃុំ ស្រុក ខេត្ត" : "House no., street, or complete address"}
+                          placeholder={lang === "km" ? "ឧ. ផ្ទះលេខ..., ផ្លូវ..., ឬអាសយដ្ឋានពេញ" : "House no., street, or complete address"}
                           value={studentForm.address}
                           onChange={(e) => setStudentForm({ ...studentForm, address: e.target.value })}
                           className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-50 transition-all font-sans resize-none"
                         />
                       </div>
 
-                      <div className="flex justify-end gap-3 pt-4 border-t border-slate-150">
+                      <div className="sticky bottom-0 -mx-5 sm:-mx-6 px-5 sm:px-6 py-3 border-t border-slate-150 bg-white/95 backdrop-blur flex justify-end gap-3">
                         <button
                           type="button"
                           onClick={() => setShowAddForm(false)}
@@ -3127,7 +3353,7 @@ export default function App() {
                       <strong className="text-[#3b82f6] font-semibold">{st.telegram}</strong>
                     </div>
                     <div className="flex justify-between gap-3">
-                      <span>{lang === "km" ? "ឈ្មោះសាលាកំពុងបង្រៀន:" : "School:"}</span>
+                      <span>{lang === "km" ? "ឈ្មោះសាលា:" : "School:"}</span>
                       <strong className="text-slate-900 font-semibold text-right">{st.schoolName || "-"}</strong>
                     </div>
                     <div className="pt-2 border-t border-slate-50 leading-snug space-y-1">
@@ -3493,7 +3719,7 @@ export default function App() {
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-32">{t.colDOB}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36">{t.colPhone}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36">{t.colTelegram}</th>
-                    <th scope="col" className="px-4 py-3 border-r border-slate-200 w-40">{lang === "km" ? "ឈ្មោះសាលាកំពុងបង្រៀន" : "School"}</th>
+                    <th scope="col" className="px-4 py-3 border-r border-slate-200 w-40">{lang === "km" ? "ឈ្មោះសាលា" : "School"}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200">{t.colAddress}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-36 text-center">{t.colStatus}</th>
                     <th scope="col" className="px-4 py-3 border-r border-slate-200 w-32 text-center">{lang === "km" ? "ព្រឹក/រសៀល" : "AM/PM"}</th>
