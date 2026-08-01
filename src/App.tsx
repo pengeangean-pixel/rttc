@@ -1,3 +1,36 @@
+import { 
+  CheckCircle, 
+  Search, 
+  Plus, 
+  Trash2, 
+  Edit, 
+  Calendar, 
+  X, 
+  Check, 
+  LogOut, 
+  Globe, 
+  ChevronLeft, 
+  ChevronRight, 
+  Clock,
+  UserPlus,
+  Save,
+  Building,
+  Phone,
+  Send,
+  MapPin,
+  FileText,
+  User,
+  UserCheck, // 👈 បន្ថែម UserCheck ត្រង់នេះ!
+  Shield,
+  Heart,
+  RefreshCw,
+  Lock,
+  Download,
+  Camera,
+  Flag,
+  Key,
+  QrCode
+} from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "./firebase";
 import { 
