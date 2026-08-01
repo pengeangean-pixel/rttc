@@ -24,7 +24,6 @@ export type AttendanceStatus =
   | "Absent_Permission" 
   | "Absent_No_Permission";
 
-/** ទុកតែ ព្រឹក និង រសៀល */
 export type AttendanceShift = "morning" | "afternoon";
 
 export interface AttendanceRecord {
@@ -34,17 +33,5 @@ export interface AttendanceRecord {
   shift?: AttendanceShift; // "morning" | "afternoon"
   status: AttendanceStatus;
   checkInTime?: string;
-  latitude?: number;
-  longitude?: number;
-  verifiedByQR?: boolean;
-  morningAbsent?: boolean;
-  afternoonAbsent?: boolean;
   absenceNote?: string;
-}
-
-export interface GeofenceConfig {
-  latitude: number;
-  longitude: number;
-  radius: number;
-  isEnabled: boolean;
 }
