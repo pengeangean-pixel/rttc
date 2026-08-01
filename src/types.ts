@@ -46,3 +46,21 @@ export interface GeofenceConfig {
   radius: number; // in meters
   isEnabled: boolean;
 }
+export interface Student {
+  id: string;
+  name: string;
+  latinName?: string;
+  gender: 'M' | 'F';
+  phone?: string;
+  telegram?: string;
+  school?: string;
+}
+
+export interface AttendanceRecord {
+  id?: string;
+  studentId: string;
+  date: string;
+  shift: 'morning' | 'afternoon'; // <<-- បន្ថែមចំណុចនេះ
+  status: 'present' | 'absent' | 'late' | 'permission';
+  note?: string;
+}
