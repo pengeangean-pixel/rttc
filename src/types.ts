@@ -49,4 +49,5 @@ export interface UserProfile {
   schoolName: string;
   schoolCode: string;
   gradeClass: string;
+  profilePhoto?: string;
 }
