@@ -137,7 +137,7 @@ const initialProfile: UserProfile = {
   currentAddress: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolCode: "25101401064",
-  gradeClass: "ថ្នាក់ទី ៣គ (គ)",
+  gradeClass: "ថ្នាក់ទី",
   profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
 };
 
