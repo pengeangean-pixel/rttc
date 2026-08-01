@@ -273,7 +273,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  // 🔥 Multi-Select Students State សម្រាប់លុបច្រើនក្នុងពេលតែមួយ
+  // Multi-Select Students State សម្រាប់លុបច្រើនក្នុងពេលតែមួយ
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
   // CSV Bulk Import Modal State
@@ -306,7 +306,9 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
-  const csvFileInputRef = useRef<HTMLInputElement>(null);
+  // Refs សម្រាប់ File Inputs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const csvFileInputRef = useRef<HTMLInputElement>(null); // 👈 ទាំងពីរនេះបានប្រកាសរួចរាល់
 
   const triggerToast = (msg: string) => {
     setToast(msg);
@@ -356,7 +358,7 @@ export default function App() {
     };
   }, []);
 
-  // 🔥 មុខងារទាញយកតារាងគំរូ CSV (Download CSV Import Template)
+  // ទាញយកតារាងគំរូ CSV (Download CSV Template)
   const handleDownloadCSVTemplate = () => {
     const BOM = "\uFEFF";
     const headers = ["ID", "ឈ្មោះ", "ភេទ", "ថ្ងៃកំណើត(YYYY-MM-DD)", "លេខទូរស័ព្ទ", "Telegram", "ឈ្មោះសាលារៀន", "ភូមិ", "ឃុំ", "ស្រុក", "ខេត្ត"];
@@ -380,7 +382,7 @@ export default function App() {
     triggerToast("បានទាញយកតារាងគំរូ CSV រួចរាល់!");
   };
 
-  // 🔥 មុខងារ Upload / Import ឯកសារ CSV សិស្សច្រើននាក់
+  // Upload / Import CSV សិស្សច្រើននាក់
   const handleCSVImportUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -435,7 +437,6 @@ export default function App() {
           return;
         }
 
-        // រក្សាទុកចូល Firestore
         const batch = writeBatch(db);
         parsedStudents.forEach(st => {
           batch.set(doc(db, "students", st.id), removeUndefinedFields(st));
@@ -463,7 +464,7 @@ export default function App() {
     e.target.value = "";
   };
 
-  // 🔥 មុខងារជ្រើសរើសសិស្សដើម្បីលុបច្រើននាក់ (Bulk Delete Function)
+  // ជ្រើសរើសសិស្សដើម្បីលុបច្រើននាក់ (Bulk Delete)
   const toggleSelectStudent = (id: string) => {
     setSelectedStudentIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -690,7 +691,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
       
-      {/* Hidden File Input Profile */}
+      {/* Hidden File Input សម្រាប់ Profile Photo */}
       <input
         type="file"
         ref={fileInputRef}
@@ -720,6 +721,8 @@ export default function App() {
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           
           <nav className="flex space-x-1.5 w-full sm:w-auto overflow-x-auto">
+            
+            {/* 🎓 1. HOME TAB */}
             <button
               onClick={() => setActiveTab("home")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -730,6 +733,7 @@ export default function App() {
               <span>ទំព័រដើម</span>
             </button>
 
+            {/* 👤 2. ACCOUNT TAB */}
             <button
               onClick={() => setActiveTab("account")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -740,6 +744,7 @@ export default function App() {
               <span>គណនីខ្ញុំ</span>
             </button>
 
+            {/* 👨‍🎓 3. STUDENTS TAB */}
             <button
               onClick={() => setActiveTab("students")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -750,6 +755,7 @@ export default function App() {
               <span>គ្រប់គ្រងសិស្ស</span>
             </button>
 
+            {/* 📊 4. REPORTS TAB */}
             <button
               onClick={() => setActiveTab("reports")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -786,6 +792,7 @@ export default function App() {
         {activeTab === "home" && (
           <div className="space-y-6">
             
+            {/* Welcome Banner */}
             <div className="bg-gradient-to-r from-[#0f2b5c] via-blue-900 to-slate-900 text-white p-6 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="space-y-2 text-center md:text-left">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-amber-300 backdrop-blur-xs">
@@ -1231,7 +1238,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស (មាន Multi-Select & Bulk CSV Import) ================= */}
+        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស ================= */}
         {activeTab === "students" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
@@ -1241,7 +1248,6 @@ export default function App() {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {/* 📥 ប៊ូតុង នាំចូល CSV (Bulk Import) */}
                 <button
                   onClick={() => setShowCSVModal(true)}
                   className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
@@ -1250,7 +1256,6 @@ export default function App() {
                   <span>នាំចូល CSV</span>
                 </button>
 
-                {/* 🗑️ ប៊ូតុង លុបសិស្សច្រើននាក់ (Bulk Delete) */}
                 {selectedStudentIds.length > 0 && (
                   <button
                     onClick={handleBulkDeleteStudents}
@@ -1261,7 +1266,6 @@ export default function App() {
                   </button>
                 )}
 
-                {/* ➕ ប៊ូតុង បន្ថែមសិស្សថ្មី */}
                 <button
                   onClick={() => {
                     setEditingStudentId(null);
@@ -1276,7 +1280,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Select All Bar */}
             <div className="flex justify-between items-center bg-slate-100 p-3 rounded-xl text-xs font-bold text-slate-700">
               <button
                 onClick={toggleSelectAllStudents}
@@ -1295,7 +1298,6 @@ export default function App() {
               )}
             </div>
 
-            {/* បញ្ជីសិស្សជាមួយ Checkbox */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
               {filteredList.map((st, i) => {
                 const isSelected = selectedStudentIds.includes(st.id);
@@ -1309,7 +1311,6 @@ export default function App() {
                     <div>
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          {/* Multi Select Checkbox */}
                           <button
                             type="button"
                             onClick={() => toggleSelectStudent(st.id)}
@@ -1416,7 +1417,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 📊 4. TAB: របាយការណ៍ (REPORTS) ================= */}
+        {/* ================= 📊 4. TAB: របាយការណ៍ ================= */}
         {activeTab === "reports" && (
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
             
@@ -1503,7 +1504,7 @@ export default function App() {
 
       </div>
 
-      {/* MODAL នាំចូល CSV/EXCEL (BULK CSV IMPORT MODAL) */}
+      {/* MODAL នាំចូល CSV/EXCEL */}
       <AnimatePresence>
         {showCSVModal && (
           <motion.div
@@ -1529,7 +1530,6 @@ export default function App() {
               </div>
 
               <div className="space-y-4 text-xs">
-                {/* Step 1: Download Template */}
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
                   <span className="font-extrabold text-slate-800 block">១. ទាញយកតារាងគំរូ CSV ៖</span>
                   <p className="text-slate-500 text-[11px]">ទាញយកតារាងគំរូ រួចបំពេញឈ្មោះសិស្ស ភេទ និងលេខទូរស័ព្ទក្នុង Excel</p>
@@ -1542,7 +1542,6 @@ export default function App() {
                   </button>
                 </div>
 
-                {/* Step 2: Upload Completed File */}
                 <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-2 text-center">
                   <span className="font-extrabold text-emerald-900 block text-left">២. ជ្រើសរើសឯកសារ CSV ដែលបានបំពេញរួច ៖</span>
                   
@@ -1577,7 +1576,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* MODAL កែប្រែព័ត៌មានគណនីគ្រូ (EDIT TEACHER PROFILE MODAL) */}
+      {/* MODAL កែប្រែព័ត៌មានគណនីគ្រូ */}
       <AnimatePresence>
         {showProfileEditModal && (
           <motion.div
@@ -1711,7 +1710,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* MODAL បំពេញព័ត៌មានសិស្ស (ADD / EDIT STUDENT MODAL) */}
+      {/* MODAL បំពេញព័ត៌មានសិស្ស */}
       <AnimatePresence>
         {showStudentModal && (
           <motion.div
