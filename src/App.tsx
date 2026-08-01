@@ -15,14 +15,11 @@ import {
 } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Users, 
-  QrCode, 
   CheckCircle, 
   Search, 
   Plus, 
   Trash2, 
   Edit, 
-  UserCheck, 
   Calendar, 
   X, 
   Check, 
@@ -38,10 +35,10 @@ import {
   Send,
   MapPin
 } from "lucide-react";
-import { Student, AttendanceRecord, GeofenceConfig, AttendanceStatus, AttendanceShift } from "./types";
+import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift } from "./types";
 import QRCode from "qrcode";
 
-// បញ្ជីសិស្សលំនាំដើម
+// បញ្ជីសិស្សលំនាំដើម (លុបប្រធានថ្នាក់ចេញ)
 const defaultStudentsList: Student[] = [
   {
     id: "s-101",
@@ -56,8 +53,7 @@ const defaultStudentsList: Student[] = [
     village: "ភូមិវាល",
     commune: "ឃុំព្រៃឈរ",
     district: "ស្រុកព្រៃឈរ",
-    province: "ខេត្តកំពង់ចាម",
-    isMonitor: false
+    province: "ខេត្តកំពង់ចាម"
   },
   {
     id: "s-102",
@@ -72,8 +68,7 @@ const defaultStudentsList: Student[] = [
     village: "ភូមិថ្មី",
     commune: "ឃុំជ្រៃវៀន",
     district: "ស្រុកព្រៃឈរ",
-    province: "ខេត្តកំពង់ចាម",
-    isMonitor: false
+    province: "ខេត្តកំពង់ចាម"
   },
   {
     id: "s-103",
@@ -88,8 +83,7 @@ const defaultStudentsList: Student[] = [
     village: "ភូមិអូរ",
     commune: "ឃុំតាអុង",
     district: "ស្រុកចំការលើ",
-    province: "ខេត្តកំពង់ចាម",
-    isMonitor: true
+    province: "ខេត្តកំពង់ចាម"
   }
 ];
 
@@ -242,11 +236,11 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>(defaultStudentsList);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
-  const [shift, setShift] = useState<AttendanceShift>("noon"); // "morning" | "noon" | "afternoon"
+  const [shift, setShift] = useState<AttendanceShift>("morning"); // ទុកតែ "morning" | "afternoon"
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  // Student Form & Modal States (សម្រាប់បន្ថែមកែប្រែសិស្ស)
+  // Student Form & Modal (លុបប្រធានថ្នាក់ចេញ)
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const emptyStudentForm: Omit<Student, "id"> = {
@@ -261,12 +255,11 @@ export default function App() {
     village: "",
     commune: "",
     district: "",
-    province: "",
-    isMonitor: false
+    province: ""
   };
   const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
 
-  // Auth & QR States
+  // Auth & QR
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
@@ -275,13 +268,11 @@ export default function App() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Auth Observer
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => setFirebaseUser(user));
     return () => unsub();
   }, []);
 
-  // Firestore Live Listener
   useEffect(() => {
     const qStudents = query(collection(db, "students"));
     const unsubStudents = onSnapshot(qStudents, (snap) => {
@@ -303,7 +294,6 @@ export default function App() {
     };
   }, []);
 
-  // QR Code Generation
   useEffect(() => {
     const generateQR = async () => {
       try {
@@ -317,7 +307,7 @@ export default function App() {
     generateQR();
   }, [selectedDate, shift]);
 
-  // 🔥 បង្កើត KEY ដោយរ៉ាប់បញ្ចូលទាំង (studentId + date + shift) ដើម្បីបំបែកទិន្នន័យតាមវេន និងតាមថ្ងៃ!
+  // រក្សាទុកវត្តមានតាម Date + Shift
   const updateAttendanceStatus = async (studentId: string, newStatus: AttendanceStatus) => {
     const recordId = `${studentId}-${selectedDate}-${shift}`;
     
@@ -336,11 +326,10 @@ export default function App() {
 
     try {
       await setDoc(doc(db, "attendance", recordId), removeUndefinedFields(newRecord), { merge: true });
-      const shiftText = shift === "morning" ? "វេនព្រឹក" : shift === "noon" ? "វេនថ្ងៃត្រង់" : "វេនរសៀល";
+      const shiftText = shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល";
       triggerToast(`បានកត់ត្រាវត្តមាន (${shiftText}) រួចរាល់!`);
     } catch (err) {
       console.error("Error saving to Firestore:", err);
-      // Fallback Local Update
       setAttendance(prev => {
         const exists = prev.some(r => r.id === recordId);
         return exists ? prev.map(r => r.id === recordId ? { ...r, status: newStatus } : r) : [...prev, newRecord];
@@ -349,7 +338,6 @@ export default function App() {
     }
   };
 
-  // ទាញយកវត្តមានសិស្សតាម Date និង Shift បច្ចុប្បន្ន
   const getDailyList = () => {
     return students.map(st => {
       const recordId = `${st.id}-${selectedDate}-${shift}`;
@@ -362,7 +350,6 @@ export default function App() {
     });
   };
 
-  // រក្សាទុកព័ត៌មានសិស្សថ្មី ឬ កែប្រែសិស្ស (Add / Edit Student)
   const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!studentForm.name || !studentForm.phoneNumber) {
@@ -372,13 +359,11 @@ export default function App() {
 
     try {
       if (editingStudentId) {
-        // Edit Mode
         const updatedStudent: Student = { id: editingStudentId, ...studentForm };
         await setDoc(doc(db, "students", editingStudentId), removeUndefinedFields(updatedStudent));
         setStudents(prev => prev.map(s => s.id === editingStudentId ? updatedStudent : s));
         triggerToast("បានកែប្រែព័ត៌មានសិស្សជោគជ័យ!");
       } else {
-        // Add Mode
         const newId = `s-${Date.now()}`;
         const newStudent: Student = { id: newId, ...studentForm };
         await setDoc(doc(db, "students", newId), removeUndefinedFields(newStudent));
@@ -395,7 +380,6 @@ export default function App() {
     }
   };
 
-  // លុបឈ្មោះសិស្ស
   const handleDeleteStudent = async (id: string, name: string) => {
     if (!window.confirm(`តើអ្នកពិតជាចង់លុបសិស្សឈ្មោះ "${name}" មែនទេ?`)) return;
     try {
@@ -408,7 +392,6 @@ export default function App() {
     }
   };
 
-  // កែប្រែសិស្ស (Open Edit Modal)
   const handleEditInit = (st: Student) => {
     setEditingStudentId(st.id);
     setStudentForm({
@@ -423,8 +406,7 @@ export default function App() {
       village: st.village || "",
       commune: st.commune || "",
       district: st.district || "",
-      province: st.province || "",
-      isMonitor: !!st.isMonitor
+      province: st.province || ""
     });
     setShowStudentModal(true);
   };
@@ -432,7 +414,6 @@ export default function App() {
   const dailyList = getDailyList();
   const filteredList = dailyList.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // ស្ថិតិវត្តមាន
   const totalCount = students.length;
   const presentCount = dailyList.filter(s => s.status === "Present").length;
   const absentCount = dailyList.filter(s => s.status === "Absent" || s.status === "Absent_No_Permission").length;
@@ -440,7 +421,7 @@ export default function App() {
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] text-slate-800 font-sans pb-12">
+    <div className="min-h-screen bg-[#f1f5f9] text-slate-800 font-sans flex flex-col justify-between">
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -457,7 +438,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-6xl mx-auto px-4 py-6">
+      <div className="max-w-6xl mx-auto px-4 py-6 w-full flex-1">
         
         {/* App Header */}
         <header className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -496,7 +477,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* Tab Navigation Switches */}
+        {/* Tab Navigation */}
         <nav className="flex space-x-2 bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-xs mb-6">
           <button
             onClick={() => setActiveTab("dashboard")}
@@ -534,11 +515,11 @@ export default function App() {
                 <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស</h2>
               </div>
               <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
-                {shift === "morning" ? "វេនព្រឹក" : shift === "noon" ? "វេនថ្ងៃត្រង់" : "វេនរសៀល"}
+                {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
               </span>
             </div>
 
-            {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន (Date & Shift Controls) */}
+            {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន (ទុកតែ ព្រឹក និង រសៀល) */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">
@@ -562,8 +543,7 @@ export default function App() {
                   className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-600 transition-all cursor-pointer"
                 >
                   <option value="morning">វេនព្រឹក (07:30–11:00)</option>
-                  <option value="noon">វេនថ្ងៃត្រង់ (10:30–14:00)</option>
-                  <option value="afternoon">វេនរសៀល (14:00–17:00)</option>
+                  <option value="afternoon">វេនរសៀល (13:00–17:00)</option>
                 </select>
               </div>
             </div>
@@ -608,7 +588,7 @@ export default function App() {
               />
             </div>
 
-            {/* កាតសិស្ស និងប៊ូតុងចុចវត្តមានទាំង ៤ */}
+            {/* កាតសិស្ស */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredList.map((st, i) => (
                 <div
@@ -689,7 +669,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 2: បញ្ជីឈ្មោះសិស្ស និងកន្លែងបំពេញព័ត៌មាន (ADMIN & STUDENT FORM) ================= */}
+        {/* ================= TAB 2: បញ្ជីឈ្មោះសិស្ស ================= */}
         {activeTab === "admin" && (
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
             
@@ -712,17 +692,13 @@ export default function App() {
               </button>
             </div>
 
-            {/* បញ្ជីសិស្សបង្ហាញជាកាត */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {students.map((st, i) => (
                 <div key={st.id} className="p-4 border border-slate-200 rounded-2xl bg-slate-50/50 hover:bg-white hover:shadow-xs transition-all flex flex-col justify-between space-y-3">
                   <div>
                     <div className="flex justify-between items-start">
-                      <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                      <h4 className="font-bold text-slate-900 text-sm">
                         {i + 1}. {st.name}
-                        {st.isMonitor && (
-                          <span className="text-[9px] bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded font-black">ប្រធាន</span>
-                        )}
                       </h4>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${st.gender === "ស្រី" || st.gender === "Female" ? "bg-pink-100 text-pink-700" : "bg-blue-100 text-blue-700"}`}>
                         {st.gender}
@@ -749,7 +725,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* ប៊ូតុង Edit & Delete */}
                   <div className="flex gap-2 pt-2 border-t border-slate-200/60 justify-end">
                     <button
                       onClick={() => handleEditInit(st)}
@@ -773,7 +748,7 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL បំពេញព័ត៌មានសិស្ស (ADD / EDIT STUDENT MODAL) */}
+        {/* MODAL បំពេញព័ត៌មានសិស្ស (លុបប្រធានថ្នាក់ចេញ) */}
         <AnimatePresence>
           {showStudentModal && (
             <motion.div
@@ -869,7 +844,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* អាសយដ្ឋាន */}
                   <div className="pt-2 border-t space-y-2">
                     <label className="block font-bold text-slate-700">អាសយដ្ឋានរស់នៅ</label>
                     <div className="grid grid-cols-2 gap-2">
@@ -904,17 +878,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 pt-2">
-                    <input
-                      type="checkbox"
-                      id="chk-monitor"
-                      checked={studentForm.isMonitor}
-                      onChange={(e) => setStudentForm({ ...studentForm, isMonitor: e.target.checked })}
-                      className="w-4 h-4 text-blue-600 rounded cursor-pointer"
-                    />
-                    <label htmlFor="chk-monitor" className="font-bold text-slate-700 cursor-pointer">ជាប្រធានថ្នាក់ (Class Monitor)</label>
-                  </div>
-
                   <div className="flex justify-end gap-2 pt-4 border-t">
                     <button
                       type="button"
@@ -944,14 +907,14 @@ export default function App() {
             {qrCodeDataUrl ? (
               <img src={qrCodeDataUrl} alt="QR Code" className="w-64 h-64 mx-auto rounded-xl border border-slate-200 p-2" />
             ) : null}
-            <p className="text-xs text-slate-500">ស្កេនកូដនេះដើម្បីចុះឈ្មោះវត្តមានប្រចាំថ្ងៃ ({shift === "morning" ? "វេនព្រឹក" : shift === "noon" ? "វេនថ្ងៃត្រង់" : "វេនរសៀល"})</p>
+            <p className="text-xs text-slate-500">ស្កេនកូដនេះដើម្បីចុះឈ្មោះវត្តមានប្រចាំថ្ងៃ ({shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"})</p>
           </div>
         )}
 
         {/* ================= TAB 4: REPORTS ================= */}
         {activeTab === "sheets" && (
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-4 overflow-x-auto">
-            <h3 className="text-base font-extrabold text-slate-900">របាយការណ៍សរុបវត្តមាន ({selectedDate} - {shift === "morning" ? "វេនព្រឹក" : shift === "noon" ? "វេនថ្ងៃត្រង់" : "វេនរសៀល"})</h3>
+            <h3 className="text-base font-extrabold text-slate-900">របាយការណ៍សរុបវត្តមាន ({selectedDate} - {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"})</h3>
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-100 border-b text-slate-600 font-bold">
@@ -987,6 +950,17 @@ export default function App() {
         )}
 
       </div>
+
+      {/* 🦶 FOOTER (បន្ថែមមកវិញយ៉ាងស្អាត) */}
+      <footer className="mt-12 py-6 bg-white border-t border-slate-200/80 text-center text-slate-500 text-xs font-sans">
+        <p className="font-bold text-slate-700 uppercase tracking-wider mb-1">
+          មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម - RTTC Kampong Cham
+        </p>
+        <p className="text-slate-400 text-[11px]">
+          Copyright © 2026. Classroom Attendance & Geofenced System.
+        </p>
+      </footer>
+
     </div>
   );
 }
