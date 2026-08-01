@@ -72,7 +72,7 @@ const initialProfile: UserProfile = {
   currentAddress: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolCode: "25101401064",
-  gradeClass: "ថ្នាក់ទី",
+  gradeClass: " ",
   profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
 };
 
@@ -1060,7 +1060,7 @@ export default function App() {
         {/* Footer */}
         <footer className="mt-12 py-6 bg-white border-t border-slate-200/80 text-center text-slate-500 text-xs font-sans">
           <p className="font-bold text-slate-700 uppercase tracking-wider mb-1">
-            {userProfile.schoolName} - {userProfile.gradeClass}
+            {userProfile.schoolName}
           </p>
           <p className="text-slate-400 text-[11px]">
             Copyright © 2026. Student Attendance & Management System.
