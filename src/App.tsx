@@ -47,9 +47,7 @@ import {
   Key,
   QrCode,
   GraduationCap,
-  FileSpreadsheet,
-  Sparkles,
-  Upload
+  Sparkles
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile } from "./types";
 import QRCode from "qrcode";
@@ -229,9 +227,6 @@ export default function App() {
   const [showProfileEditModal, setShowProfileEditModal] = useState(false);
   const [editProfileForm, setEditProfileForm] = useState<UserProfile>(initialProfile);
 
-  // CSV Bulk Import Modal
-  const [showCSVModal, setShowCSVModal] = useState(false);
-
   // Student Form & Modal
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
@@ -256,7 +251,6 @@ export default function App() {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const csvFileInputRef = useRef<HTMLInputElement>(null);
 
   const triggerToast = (msg: string) => {
     setToast(msg);
@@ -282,7 +276,7 @@ export default function App() {
     generateUserQR();
   }, [userProfile]);
 
-  // 🔥 Sync គរុនិស្សិតពី Firestore
+  // Sync គរុនិស្សិតពី Firestore
   useEffect(() => {
     const qStudents = query(collection(db, "students"));
     const unsubStudents = onSnapshot(qStudents, (snap) => {
@@ -306,7 +300,7 @@ export default function App() {
     };
   }, []);
 
-  // ⚡ មុខងារបង្កើតទិន្នន័យគរុនិស្សិត ២១២ នាក់ស្វ័យប្រវត្តិ (Auto-Generate 212 Trainees)
+  // ⚡ បង្កើត ២១២ នាក់ស្វ័យប្រវត្តិ
   const handleGenerate212Students = async () => {
     if (!window.confirm("តើអ្នកពិតជាចង់បង្កើតបញ្ជីឈ្មោះគរុនិស្សិតចំនួន ២១២ នាក់ចូលក្នុងប្រព័ន្ធមែនទេ?")) return;
     
@@ -336,7 +330,6 @@ export default function App() {
     }
 
     try {
-      // រក្សាទុកចូល Firestore តាម Batch
       const batch = writeBatch(db);
       generatedList.forEach(st => {
         batch.set(doc(db, "students", st.id), removeUndefinedFields(st));
@@ -540,235 +533,6 @@ export default function App() {
   const lateCount = dailyList.filter(s => s.status === "Late").length;
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
 
-  // Component Dashboard
-  const AttendanceDashboardComponent = () => (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[#0f2b5c]">
-          <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
-          <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
-        </div>
-        <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
-          {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
-        </span>
-      </div>
-
-      {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1.5">
-            កាលបរិច្ឆេទ
-          </label>
-          <PremiumDatePicker
-            id="rttc-date-input"
-            value={selectedDate}
-            onChange={setSelectedDate}
-            lang={lang}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1.5">
-            វេន <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={shift}
-            onChange={(e) => setShift(e.target.value as AttendanceShift)}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-600 transition-all cursor-pointer"
-          >
-            <option value="morning">វេនព្រឹក (07:30–11:00)</option>
-            <option value="afternoon">វេនរសៀល (13:00–17:00)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* របារបង្ហាញស្ថិតិ ៥ ប្រអប់ */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-          <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
-          <span className="text-xs font-bold text-slate-500">សរុប</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-          <span className="text-2xl font-black text-emerald-600 block mb-1">{presentCount}</span>
-          <span className="text-xs font-bold text-slate-500">វត្តមាន</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-          <span className="text-2xl font-black text-red-600 block mb-1">{absentCount}</span>
-          <span className="text-xs font-bold text-slate-500">អវត្តមាន</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-          <span className="text-2xl font-black text-amber-600 block mb-1">{lateCount}</span>
-          <span className="text-xs font-bold text-slate-500">យឺត</span>
-        </div>
-
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs col-span-2 sm:col-span-1">
-          <span className="text-2xl font-black text-blue-600 block mb-1">{permissionCount}</span>
-          <span className="text-xs font-bold text-slate-500">ច្បាប់</span>
-        </div>
-      </div>
-
-      {/* ស្វែងរកសិស្ស */}
-      <div className="relative max-w-sm">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-        <input
-          type="text"
-          placeholder="ស្វែងរកឈ្មោះ, លេខទូរស័ព្ទ..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-blue-600 font-semibold"
-        />
-      </div>
-
-      {/* កាតសិស្ស */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
-        {filteredList.map((st, i) => (
-          <div
-            key={st.id}
-            className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
-                    {i + 1}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
-                      {st.name}
-                    </h4>
-                    <p className="text-xs text-slate-400 font-mono truncate">
-                      {st.telegram || st.phoneNumber || `student_${i + 1}`}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleEditInit(st)}
-                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="កែប្រែ"
-                  >
-                    <Edit className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteStudent(st.id, st.name)}
-                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="លុប"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => updateAttendanceStatus(st.id, "Present")}
-                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                    st.status === "Present"
-                      ? "bg-emerald-600 text-white shadow-xs"
-                      : "text-emerald-700 hover:bg-emerald-50"
-                  }`}
-                >
-                  <Check className="w-4 h-4 mb-0.5" />
-                  <span>វត្តមាន</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => updateAttendanceStatus(st.id, "Absent")}
-                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                    st.status === "Absent" || st.status === "Absent_No_Permission"
-                      ? "bg-red-600 text-white shadow-xs"
-                      : "text-red-700 hover:bg-red-50"
-                  }`}
-                >
-                  <X className="w-4 h-4 mb-0.5" />
-                  <span>អវត្តមាន</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => updateAttendanceStatus(st.id, "Late")}
-                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                    st.status === "Late"
-                      ? "bg-amber-500 text-white shadow-xs"
-                      : "text-amber-700 hover:bg-amber-50"
-                  }`}
-                >
-                  <Clock className="w-4 h-4 mb-0.5" />
-                  <span>យឺត</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => updateAttendanceStatus(st.id, "Permission")}
-                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                    st.status === "Permission" || st.status === "Absent_Permission"
-                      ? "bg-blue-600 text-white shadow-xs"
-                      : "text-blue-700 hover:bg-blue-50"
-                  }`}
-                >
-                  <Calendar className="w-4 h-4 mb-0.5" />
-                  <span>ច្បាប់</span>
-                </button>
-              </div>
-
-              {/* ប្រអប់សរសេរមូលហេតុ */}
-              <AnimatePresence>
-                {st.status !== "Present" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="pt-2 border-t border-slate-100 space-y-1 overflow-hidden mt-2"
-                  >
-                    <label className="block text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
-                      <FileText className="w-3.5 h-3.5 text-blue-600" />
-                      <span>
-                        មូលហេតុ ({st.status === "Absent" || st.status === "Absent_No_Permission" ? "អវត្តមាន" : st.status === "Late" ? "មកយឺត" : "សុំច្បាប់"}) ៖
-                      </span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="បញ្ចូលមូលហេតុ (ឧ. ឈឺ, ស្ទះផ្លូវ, មានធុរៈ...)"
-                      value={st.absenceNote || ""}
-                      onChange={(e) => {
-                        const newNote = e.target.value;
-                        setAttendance(prev => {
-                          const recordId = `${st.id}-${selectedDate}-${shift}`;
-                          const exists = prev.some(r => r.id === recordId);
-                          if (exists) {
-                            return prev.map(r => r.id === recordId ? { ...r, absenceNote: newNote } : r);
-                          } else {
-                            return [...prev, {
-                              id: recordId,
-                              studentId: st.id,
-                              date: selectedDate,
-                              shift,
-                              status: st.status,
-                              absenceNote: newNote
-                            }];
-                          }
-                        });
-                      }}
-                      onBlur={(e) => updateAbsenceNote(st.id, e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 font-semibold text-slate-800 transition-all"
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
       
@@ -869,11 +633,11 @@ export default function App() {
           </div>
         </header>
 
-        {/* ================= 🎓 1. HOME TAB (បង្ហាញដំបូង + DASHBOARD វត្តមាន) ================= */}
+        {/* ================= 🎓 1. HOME TAB ================= */}
         {activeTab === "home" && (
           <div className="space-y-6">
             
-            {/* Welcome School Banner */}
+            {/* Welcome Banner */}
             <div className="bg-gradient-to-r from-[#0f2b5c] via-blue-900 to-slate-900 text-white p-6 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="space-y-2 text-center md:text-left">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-amber-300 backdrop-blur-xs">
@@ -887,7 +651,6 @@ export default function App() {
               </div>
 
               <div className="flex gap-2">
-                {/* ⚡ ប៊ូតុងបង្កើត ២១២ នាក់ស្វ័យប្រវត្តិ */}
                 <button
                   onClick={handleGenerate212Students}
                   className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg transition-all shrink-0 flex items-center gap-1.5"
@@ -899,8 +662,232 @@ export default function App() {
               </div>
             </div>
 
-            {/* វត្តមានសិស្សខាងក្រោម (Attendance Dashboard) */}
-            <AttendanceDashboardComponent />
+            {/* Dashboard វត្តមានសិស្ស */}
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#0f2b5c]">
+                  <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
+                  <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
+                </div>
+                <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
+                  {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
+                </span>
+              </div>
+
+              {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    កាលបរិច្ឆេទ
+                  </label>
+                  <PremiumDatePicker
+                    id="rttc-date-input"
+                    value={selectedDate}
+                    onChange={setSelectedDate}
+                    lang={lang}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    វេន <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={shift}
+                    onChange={(e) => setShift(e.target.value as AttendanceShift)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-600 transition-all cursor-pointer"
+                  >
+                    <option value="morning">វេនព្រឹក (07:30–11:00)</option>
+                    <option value="afternoon">វេនរសៀល (13:00–17:00)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* របារបង្ហាញស្ថិតិ ៥ ប្រអប់ */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+                  <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
+                  <span className="text-xs font-bold text-slate-500">សរុប</span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+                  <span className="text-2xl font-black text-emerald-600 block mb-1">{presentCount}</span>
+                  <span className="text-xs font-bold text-slate-500">វត្តមាន</span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+                  <span className="text-2xl font-black text-red-600 block mb-1">{absentCount}</span>
+                  <span className="text-xs font-bold text-slate-500">អវត្តមាន</span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+                  <span className="text-2xl font-black text-amber-600 block mb-1">{lateCount}</span>
+                  <span className="text-xs font-bold text-slate-500">យឺត</span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs col-span-2 sm:col-span-1">
+                  <span className="text-2xl font-black text-blue-600 block mb-1">{permissionCount}</span>
+                  <span className="text-xs font-bold text-slate-500">ច្បាប់</span>
+                </div>
+              </div>
+
+              {/* ស្វែងរកសិស្ស (គ្មានកំហុសរលត់ Cursor ទៀតទេ) */}
+              <div className="relative max-w-sm">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="ស្វែងរកឈ្មោះ, លេខទូរស័ព្ទ..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-blue-600 font-semibold"
+                />
+              </div>
+
+              {/* កាតសិស្ស */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
+                {filteredList.map((st, i) => (
+                  <div
+                    key={st.id}
+                    className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
+                            {i + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
+                              {st.name}
+                            </h4>
+                            <p className="text-xs text-slate-400 font-mono truncate">
+                              {st.telegram || st.phoneNumber || `student_${i + 1}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleEditInit(st)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="កែប្រែ"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStudent(st.id, st.name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="លុប"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Present")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Present"
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : "text-emerald-700 hover:bg-emerald-50"
+                          }`}
+                        >
+                          <Check className="w-4 h-4 mb-0.5" />
+                          <span>វត្តមាន</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Absent")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Absent" || st.status === "Absent_No_Permission"
+                              ? "bg-red-600 text-white shadow-xs"
+                              : "text-red-700 hover:bg-red-50"
+                          }`}
+                        >
+                          <X className="w-4 h-4 mb-0.5" />
+                          <span>អវត្តមាន</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Late")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Late"
+                              ? "bg-amber-500 text-white shadow-xs"
+                              : "text-amber-700 hover:bg-amber-50"
+                          }`}
+                        >
+                          <Clock className="w-4 h-4 mb-0.5" />
+                          <span>យឺត</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Permission")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Permission" || st.status === "Absent_Permission"
+                              ? "bg-blue-600 text-white shadow-xs"
+                              : "text-blue-700 hover:bg-blue-50"
+                          }`}
+                        >
+                          <Calendar className="w-4 h-4 mb-0.5" />
+                          <span>ច្បាប់</span>
+                        </button>
+                      </div>
+
+                      {/* ប្រអប់សរសេរមូលហេតុ */}
+                      <AnimatePresence>
+                        {st.status !== "Present" && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pt-2 border-t border-slate-100 space-y-1 overflow-hidden mt-2"
+                          >
+                            <label className="block text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                              <FileText className="w-3.5 h-3.5 text-blue-600" />
+                              <span>
+                                មូលហេតុ ({st.status === "Absent" || st.status === "Absent_No_Permission" ? "អវត្តមាន" : st.status === "Late" ? "មកយឺត" : "សុំច្បាប់"}) ៖
+                              </span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="បញ្ចូលមូលហេតុ (ឧ. ឈឺ, ស្ទះផ្លូវ, មានធុរៈ...)"
+                              value={st.absenceNote || ""}
+                              onChange={(e) => {
+                                const newNote = e.target.value;
+                                setAttendance(prev => {
+                                  const recordId = `${st.id}-${selectedDate}-${shift}`;
+                                  const exists = prev.some(r => r.id === recordId);
+                                  if (exists) {
+                                    return prev.map(r => r.id === recordId ? { ...r, absenceNote: newNote } : r);
+                                  } else {
+                                    return [...prev, {
+                                      id: recordId,
+                                      studentId: st.id,
+                                      date: selectedDate,
+                                      shift,
+                                      status: st.status,
+                                      absenceNote: newNote
+                                    }];
+                                  }
+                                });
+                              }}
+                              onBlur={(e) => updateAbsenceNote(st.id, e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 font-semibold text-slate-800 transition-all"
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
           </div>
         )}
@@ -1060,6 +1047,38 @@ export default function App() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
+                    <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
+                      <Shield className="w-4 h-4 text-blue-600" />
+                      <span>សុវត្ថិភាពគណនី</span>
+                    </span>
+                    <p className="text-[10px] text-slate-400 leading-snug">ផ្លាស់ប្តូរលេខសម្ងាត់ជាទៀងទាត់</p>
+                    <button className="w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1">
+                      <Key className="w-3.5 h-3.5 text-slate-500" />
+                      <span>ប្ដូរលេខសម្ងាត់</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
+                    <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
+                      <Heart className="w-4 h-4 text-pink-600" />
+                      <span>សុខភាព និងតម្រូវការ</span>
+                    </span>
+                    <p className="text-[10px] text-slate-400 italic">មិនមានព័ត៌មានសុខភាព</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
+                    <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
+                      <RefreshCw className="w-4 h-4 text-emerald-600" />
+                      <span>ធ្វើបច្ចុប្បន្នភាព</span>
+                    </span>
+                    <button className="w-full py-2 bg-[#0f2b5c] hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs mt-2">
+                      ធ្វើបច្ចុប្បន្នភាពឥឡូវ
+                    </button>
+                  </div>
+                </div>
+
               </div>
 
             </div>
@@ -1099,7 +1118,232 @@ export default function App() {
               </div>
             </div>
 
-            <AttendanceDashboardComponent />
+            {/* បង្ហាញវត្តមានសិស្ស */}
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#0f2b5c]">
+                  <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
+                  <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
+                </div>
+                <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
+                  {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
+                </span>
+              </div>
+
+              {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    កាលបរិច្ឆេទ
+                  </label>
+                  <PremiumDatePicker
+                    id="rttc-date-input"
+                    value={selectedDate}
+                    onChange={setSelectedDate}
+                    lang={lang}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    វេន <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={shift}
+                    onChange={(e) => setShift(e.target.value as AttendanceShift)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-600 transition-all cursor-pointer"
+                  >
+                    <option value="morning">វេនព្រឹក (07:30–11:00)</option>
+                    <option value="afternoon">វេនរសៀល (13:00–17:00)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* របារបង្ហាញស្ថិតិ ៥ ប្រអប់ */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+                  <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
+                  <span className="text-xs font-bold text-slate-500">សរុប</span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+                  <span className="text-2xl font-black text-emerald-600 block mb-1">{presentCount}</span>
+                  <span className="text-xs font-bold text-slate-500">វត្តមាន</span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+                  <span className="text-2xl font-black text-red-600 block mb-1">{absentCount}</span>
+                  <span className="text-xs font-bold text-slate-500">អវត្តមាន</span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+                  <span className="text-2xl font-black text-amber-600 block mb-1">{lateCount}</span>
+                  <span className="text-xs font-bold text-slate-500">យឺត</span>
+                </div>
+
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs col-span-2 sm:col-span-1">
+                  <span className="text-2xl font-black text-blue-600 block mb-1">{permissionCount}</span>
+                  <span className="text-xs font-bold text-slate-500">ច្បាប់</span>
+                </div>
+              </div>
+
+              {/* ស្វែងរកសិស្ស */}
+              <div className="relative max-w-sm">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="text"
+                  placeholder="ស្វែងរកឈ្មោះ, លេខទូរស័ព្ទ..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-blue-600 font-semibold"
+                />
+              </div>
+
+              {/* កាតសិស្ស */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
+                {filteredList.map((st, i) => (
+                  <div
+                    key={st.id}
+                    className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
+                            {i + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
+                              {st.name}
+                            </h4>
+                            <p className="text-xs text-slate-400 font-mono truncate">
+                              {st.telegram || st.phoneNumber || `student_${i + 1}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleEditInit(st)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="កែប្រែ"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStudent(st.id, st.name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="លុប"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Present")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Present"
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : "text-emerald-700 hover:bg-emerald-50"
+                          }`}
+                        >
+                          <Check className="w-4 h-4 mb-0.5" />
+                          <span>វត្តមាន</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Absent")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Absent" || st.status === "Absent_No_Permission"
+                              ? "bg-red-600 text-white shadow-xs"
+                              : "text-red-700 hover:bg-red-50"
+                          }`}
+                        >
+                          <X className="w-4 h-4 mb-0.5" />
+                          <span>អវត្តមាន</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Late")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Late"
+                              ? "bg-amber-500 text-white shadow-xs"
+                              : "text-amber-700 hover:bg-amber-50"
+                          }`}
+                        >
+                          <Clock className="w-4 h-4 mb-0.5" />
+                          <span>យឺត</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Permission")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Permission" || st.status === "Absent_Permission"
+                              ? "bg-blue-600 text-white shadow-xs"
+                              : "text-blue-700 hover:bg-blue-50"
+                          }`}
+                        >
+                          <Calendar className="w-4 h-4 mb-0.5" />
+                          <span>ច្បាប់</span>
+                        </button>
+                      </div>
+
+                      {/* ប្រអប់សរសេរមូលហេតុ */}
+                      <AnimatePresence>
+                        {st.status !== "Present" && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pt-2 border-t border-slate-100 space-y-1 overflow-hidden mt-2"
+                          >
+                            <label className="block text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                              <FileText className="w-3.5 h-3.5 text-blue-600" />
+                              <span>
+                                មូលហេតុ ({st.status === "Absent" || st.status === "Absent_No_Permission" ? "អវត្តមាន" : st.status === "Late" ? "មកយឺត" : "សុំច្បាប់"}) ៖
+                              </span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="បញ្ចូលមូលហេតុ (ឧ. ឈឺ, ស្ទះផ្លូវ, មានធុរៈ...)"
+                              value={st.absenceNote || ""}
+                              onChange={(e) => {
+                                const newNote = e.target.value;
+                                setAttendance(prev => {
+                                  const recordId = `${st.id}-${selectedDate}-${shift}`;
+                                  const exists = prev.some(r => r.id === recordId);
+                                  if (exists) {
+                                    return prev.map(r => r.id === recordId ? { ...r, absenceNote: newNote } : r);
+                                  } else {
+                                    return [...prev, {
+                                      id: recordId,
+                                      studentId: st.id,
+                                      date: selectedDate,
+                                      shift,
+                                      status: st.status,
+                                      absenceNote: newNote
+                                    }];
+                                  }
+                                });
+                              }}
+                              onBlur={(e) => updateAbsenceNote(st.id, e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 font-semibold text-slate-800 transition-all"
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
