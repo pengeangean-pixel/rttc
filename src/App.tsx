@@ -36,21 +36,21 @@ import {
   MapPin,
   FileText,
   User,
-  UserCheck,
   Shield,
   Heart,
   RefreshCw,
   Lock,
   Download,
   Camera,
-  Flag,
   Key,
-  QrCode
+  QrCode,
+  GraduationCap,
+  Home
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile } from "./types";
 import QRCode from "qrcode";
 
-// ព័ត៌មានគណនីគ្រូតាម Screenshot
+// ព័ត៌មានគណនីដើម
 const initialProfile: UserProfile = {
   name: "អ៊ាន ប៉េងអ៊ាង",
   role: "គ្រូបង្រៀន",
@@ -63,7 +63,8 @@ const initialProfile: UserProfile = {
   currentAddress: "ក្តុលផ្សារ, ទន្លូង, មេមត់, ខេត្តត្បូងឃ្មុំ",
   schoolName: "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ",
   schoolCode: "25101401064",
-  gradeClass: "ថ្នាក់ទី ៣គ (គ)"
+  gradeClass: "ថ្នាក់ទី ៣គ (គ)",
+  profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
 };
 
 // បញ្ជីសិស្សលំនាំដើម
@@ -136,7 +137,7 @@ const parseISODate = (dateString: string) => {
 const KHMER_MONTHS = ["មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា", "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"];
 const EN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAY_LABELS = {
-  km: ["ច", "អ", "ព", "ព្រ", "សុ", "ស", "អា"],
+  km: ["ច", "អ", "พ", "ព្រ", "សុ", "ស", "អា"],
   en: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 };
 
@@ -259,8 +260,8 @@ const PremiumDatePicker = ({ id, value, onChange, lang, placeholder }: PremiumDa
 export default function App() {
   const [lang, setLang] = useState<"km" | "en">("km");
   
-  // 3 Tabs ខាងលើ៖ account | students | reports
-  const [activeTab, setActiveTab] = useState<"account" | "students" | "reports">("account");
+  // 🔥 បើកមកបង្ហាញ Tab "home" ដំបូងគេ
+  const [activeTab, setActiveTab] = useState<"home" | "account" | "students" | "reports">("home");
 
   // Core States
   const [userProfile, setUserProfile] = useState<UserProfile>(initialProfile);
@@ -270,6 +271,10 @@ export default function App() {
   const [shift, setShift] = useState<AttendanceShift>("morning");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+
+  // Edit Teacher Profile Modal State
+  const [showProfileEditModal, setShowProfileEditModal] = useState(false);
+  const [editProfileForm, setEditProfileForm] = useState<UserProfile>(initialProfile);
 
   // Student Form & Modal
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -293,6 +298,8 @@ export default function App() {
   // Auth State
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const triggerToast = (msg: string) => {
     setToast(msg);
@@ -338,6 +345,27 @@ export default function App() {
       unsubAttendance();
     };
   }, []);
+
+  // 🔥 មុខងារប្ដូររូបភាព Profile (ត្រួតពិនិត្យមិនឱ្យលើសពី 2MB)
+  const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // ត្រួតពិនិត្យទំហំ 2MB (2 * 1024 * 1024 Bytes)
+    if (file.size > 2 * 1024 * 1024) {
+      triggerToast("⚠️ រូបភាពមិនអាចលើសពី 2MB បានទេ!");
+      e.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setUserProfile(prev => ({ ...prev, profilePhoto: result }));
+      triggerToast("បានផ្លាស់ប្តូររូបភាព Profile រួចរាល់!");
+    };
+    reader.readAsDataURL(file);
+  };
 
   // រក្សាទុកវត្តមាន
   const updateAttendanceStatus = async (studentId: string, newStatus: AttendanceStatus) => {
@@ -457,6 +485,14 @@ export default function App() {
     setShowStudentModal(true);
   };
 
+  // រក្សាទុកការកែប្រែព័ត៌មានគ្រូ
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserProfile(editProfileForm);
+    setShowProfileEditModal(false);
+    triggerToast("បានរក្សាទុកការកែប្រែព័ត៌មានគណនី!");
+  };
+
   // ទាញយករាយការណ៍ Excel / CSV
   const handleDownloadReport = () => {
     const BOM = "\uFEFF";
@@ -498,9 +534,247 @@ export default function App() {
   const lateCount = dailyList.filter(s => s.status === "Late").length;
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
 
+  // Component បង្ហាញ Dashboard វត្តមានសិស្ស
+  const AttendanceDashboardComponent = () => (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[#0f2b5c]">
+          <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
+          <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស</h2>
+        </div>
+        <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
+          {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
+        </span>
+      </div>
+
+      {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1.5">
+            កាលបរិច្ឆេទ
+          </label>
+          <PremiumDatePicker
+            id="rttc-date-input"
+            value={selectedDate}
+            onChange={setSelectedDate}
+            lang={lang}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1.5">
+            វេន <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={shift}
+            onChange={(e) => setShift(e.target.value as AttendanceShift)}
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-600 transition-all cursor-pointer"
+          >
+            <option value="morning">វេនព្រឹក (07:30–11:00)</option>
+            <option value="afternoon">វេនរសៀល (13:00–17:00)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* របារបង្ហាញស្ថិតិ ៥ ប្រអប់ */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+          <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
+          <span className="text-xs font-bold text-slate-500">សរុប</span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+          <span className="text-2xl font-black text-emerald-600 block mb-1">{presentCount}</span>
+          <span className="text-xs font-bold text-slate-500">វត្តមាន</span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+          <span className="text-2xl font-black text-red-600 block mb-1">{absentCount}</span>
+          <span className="text-xs font-bold text-slate-500">អវត្តមាន</span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+          <span className="text-2xl font-black text-amber-600 block mb-1">{lateCount}</span>
+          <span className="text-xs font-bold text-slate-500">យឺត</span>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs col-span-2 sm:col-span-1">
+          <span className="text-2xl font-black text-blue-600 block mb-1">{permissionCount}</span>
+          <span className="text-xs font-bold text-slate-500">ច្បាប់</span>
+        </div>
+      </div>
+
+      {/* ស្វែងរកសិស្ស */}
+      <div className="relative max-w-sm">
+        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+        <input
+          type="text"
+          placeholder="ស្វែងរកឈ្មោះសិស្ស..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-blue-600 font-semibold"
+        />
+      </div>
+
+      {/* កាតសិស្ស */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredList.map((st, i) => (
+          <div
+            key={st.id}
+            className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
+                    {i + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
+                      {st.name}
+                    </h4>
+                    <p className="text-xs text-slate-400 font-mono truncate">
+                      {st.telegram || st.phoneNumber || `student_${i + 1}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleEditInit(st)}
+                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="កែប្រែ"
+                  >
+                    <Edit className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteStudent(st.id, st.name)}
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="លុប"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => updateAttendanceStatus(st.id, "Present")}
+                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                    st.status === "Present"
+                      ? "bg-emerald-600 text-white shadow-xs"
+                      : "text-emerald-700 hover:bg-emerald-50"
+                  }`}
+                >
+                  <Check className="w-4 h-4 mb-0.5" />
+                  <span>វត្តមាន</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => updateAttendanceStatus(st.id, "Absent")}
+                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                    st.status === "Absent" || st.status === "Absent_No_Permission"
+                      ? "bg-red-600 text-white shadow-xs"
+                      : "text-red-700 hover:bg-red-50"
+                  }`}
+                >
+                  <X className="w-4 h-4 mb-0.5" />
+                  <span>អវត្តមាន</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => updateAttendanceStatus(st.id, "Late")}
+                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                    st.status === "Late"
+                      ? "bg-amber-500 text-white shadow-xs"
+                      : "text-amber-700 hover:bg-amber-50"
+                  }`}
+                >
+                  <Clock className="w-4 h-4 mb-0.5" />
+                  <span>យឺត</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => updateAttendanceStatus(st.id, "Permission")}
+                  className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                    st.status === "Permission" || st.status === "Absent_Permission"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-blue-700 hover:bg-blue-50"
+                  }`}
+                >
+                  <Calendar className="w-4 h-4 mb-0.5" />
+                  <span>ច្បាប់</span>
+                </button>
+              </div>
+
+              {/* ប្រអប់សរសេរមូលហេតុ */}
+              <AnimatePresence>
+                {st.status !== "Present" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="pt-2 border-t border-slate-100 space-y-1 overflow-hidden mt-2"
+                  >
+                    <label className="block text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <span>
+                        មូលហេតុ ({st.status === "Absent" || st.status === "Absent_No_Permission" ? "អវត្តមាន" : st.status === "Late" ? "មកយឺត" : "សុំច្បាប់"}) ៖
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="បញ្ចូលមូលហេតុ (ឧ. ឈឺ, ស្ទះផ្លូវ, មានធុរៈ...)"
+                      value={st.absenceNote || ""}
+                      onChange={(e) => {
+                        const newNote = e.target.value;
+                        setAttendance(prev => {
+                          const recordId = `${st.id}-${selectedDate}-${shift}`;
+                          const exists = prev.some(r => r.id === recordId);
+                          if (exists) {
+                            return prev.map(r => r.id === recordId ? { ...r, absenceNote: newNote } : r);
+                          } else {
+                            return [...prev, {
+                              id: recordId,
+                              studentId: st.id,
+                              date: selectedDate,
+                              shift,
+                              status: st.status,
+                              absenceNote: newNote
+                            }];
+                          }
+                        });
+                      }}
+                      onBlur={(e) => updateAbsenceNote(st.id, e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 font-semibold text-slate-800 transition-all"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
       
+      {/* Hidden File Input សម្រាប់ Upload រូប Profile មិនលើស 2MB */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleProfilePhotoUpload}
+        accept="image/png, image/jpeg, image/jpg, image/webp"
+        className="hidden"
+      />
+
       {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
@@ -518,13 +792,26 @@ export default function App() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
         
-        {/* 🔝 TOP NAVIGATION BAR */}
+        {/* 🔝 TOP NAVIGATION BAR (មាន Tab ដើម/Home ជាមួយ Logo Graduated) */}
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           
-          <nav className="flex space-x-1.5 w-full sm:w-auto">
+          <nav className="flex space-x-1.5 w-full sm:w-auto overflow-x-auto">
+            
+            {/* 🎓 1. HOME TAB */}
+            <button
+              onClick={() => setActiveTab("home")}
+              className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
+                activeTab === "home" ? "bg-[#0f2b5c] text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <GraduationCap className="w-4 h-4 text-amber-400" />
+              <span>ទំព័រដើម</span>
+            </button>
+
+            {/* 👤 2. ACCOUNT TAB */}
             <button
               onClick={() => setActiveTab("account")}
-              className={`flex-1 sm:flex-none px-5 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
                 activeTab === "account" ? "bg-[#0f2b5c] text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
               }`}
             >
@@ -532,9 +819,10 @@ export default function App() {
               <span>គណនីខ្ញុំ</span>
             </button>
 
+            {/* 👨‍🎓 3. STUDENTS TAB */}
             <button
               onClick={() => setActiveTab("students")}
-              className={`flex-1 sm:flex-none px-5 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
                 activeTab === "students" ? "bg-[#0f2b5c] text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
               }`}
             >
@@ -542,9 +830,10 @@ export default function App() {
               <span>គ្រប់គ្រងសិស្ស</span>
             </button>
 
+            {/* 📊 4. REPORTS TAB */}
             <button
               onClick={() => setActiveTab("reports")}
-              className={`flex-1 sm:flex-none px-5 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 ${
+              className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
                 activeTab === "reports" ? "bg-[#0f2b5c] text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
               }`}
             >
@@ -574,7 +863,39 @@ export default function App() {
           </div>
         </header>
 
-        {/* ================= 1. TAB: គណនីខ្ញុំ (MY ACCOUNT) ================= */}
+        {/* ================= 🎓 1. HOME TAB (បង្ហាញដំបូង + DASHBOARD វត្តមានខាងក្រោម) ================= */}
+        {activeTab === "home" && (
+          <div className="space-y-6">
+            
+            {/* Welcome School Banner */}
+            <div className="bg-gradient-to-r from-[#0f2b5c] via-blue-900 to-slate-900 text-white p-6 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="space-y-2 text-center md:text-left">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-amber-300 backdrop-blur-xs">
+                  <GraduationCap className="w-4 h-4" />
+                  <span>ប្រព័ន្ធគ្រប់គ្រងសាលារៀន និងវត្តមានសិស្ស</span>
+                </div>
+                <h2 className="text-xl md:text-2xl font-black">{userProfile.schoolName}</h2>
+                <p className="text-xs text-blue-200">
+                  លោកគ្រូ៖ <strong>{userProfile.name}</strong> • ទទួលបន្ទុក៖ <strong>{userProfile.gradeClass}</strong>
+                </p>
+              </div>
+
+              <button
+                onClick={() => setActiveTab("students")}
+                className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg transition-all shrink-0 flex items-center gap-2"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>គ្រប់គ្រងសិស្សក្នុងថ្នាក់</span>
+              </button>
+            </div>
+
+            {/* វត្តមានសិស្សខាងក្រោម (Attendance Dashboard) */}
+            <AttendanceDashboardComponent />
+
+          </div>
+        )}
+
+        {/* ================= 👤 2. ACCOUNT TAB (អាចកែប្រែបាន + ប្ដូររូបមិនលើស 2MB) ================= */}
         {activeTab === "account" && (
           <div className="space-y-6">
             
@@ -585,7 +906,10 @@ export default function App() {
               </h2>
 
               <button
-                onClick={() => triggerToast("មុខងារកែប្រែព័ត៌មានគណនីគ្រូ")}
+                onClick={() => {
+                  setEditProfileForm(userProfile);
+                  setShowProfileEditModal(true);
+                }}
                 className="px-4 py-2 bg-[#0f2b5c] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
               >
                 <Edit className="w-3.5 h-3.5" />
@@ -597,13 +921,19 @@ export default function App() {
               
               <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs text-center space-y-5 flex flex-col justify-between">
                 <div className="space-y-4">
+                  
+                  {/* Avatar Photo + Camera Trigger (2MB Limit) */}
                   <div className="relative w-36 h-36 mx-auto">
                     <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
+                      src={userProfile.profilePhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"}
                       alt={userProfile.name}
                       className="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-md mx-auto"
                     />
-                    <button className="absolute bottom-1 right-1 p-2 bg-white border border-slate-200 rounded-full shadow-md text-slate-600 hover:text-blue-600 transition-all">
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute bottom-1 right-1 p-2.5 bg-[#0f2b5c] text-white border-2 border-white rounded-full shadow-md hover:bg-blue-900 transition-all"
+                      title="ប្ដូររូបភាព (មិនលើស 2MB)"
+                    >
                       <Camera className="w-4 h-4" />
                     </button>
                   </div>
@@ -760,242 +1090,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 2. TAB: គ្រប់គ្រងសិស្ស (STUDENTS) ================= */}
-        {activeTab === "students" && (
-          <div className="space-y-6">
-            
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-              <div className="flex items-center gap-2 text-[#0f2b5c]">
-                <UserCheck className="w-5 h-5 text-[#0f2b5c]" />
-                <h2 className="text-lg font-extrabold tracking-tight">គ្រប់គ្រងវត្តមានសិស្ស</h2>
-              </div>
+        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស (STUDENTS) ================= */}
+        {activeTab === "students" && <AttendanceDashboardComponent />}
 
-              <button
-                onClick={() => {
-                  setEditingStudentId(null);
-                  setStudentForm(emptyStudentForm);
-                  setShowStudentModal(true);
-                }}
-                className="px-4 py-2.5 bg-[#0f2b5c] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
-              >
-                <Plus className="w-4 h-4 text-emerald-400" />
-                <span>+ បញ្ចូលសិស្សថ្មី</span>
-              </button>
-            </div>
-
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  កាលបរិច្ឆេទ
-                </label>
-                <PremiumDatePicker
-                  id="rttc-date-input"
-                  value={selectedDate}
-                  onChange={setSelectedDate}
-                  lang={lang}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  វេន <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={shift}
-                  onChange={(e) => setShift(e.target.value as AttendanceShift)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-600 transition-all cursor-pointer"
-                >
-                  <option value="morning">វេនព្រឹក (07:30–11:00)</option>
-                  <option value="afternoon">វេនរសៀល (13:00–17:00)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
-                <span className="text-xs font-bold text-slate-500">សរុប</span>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                <span className="text-2xl font-black text-emerald-600 block mb-1">{presentCount}</span>
-                <span className="text-xs font-bold text-slate-500">វត្តមាន</span>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                <span className="text-2xl font-black text-red-600 block mb-1">{absentCount}</span>
-                <span className="text-xs font-bold text-slate-500">អវត្តមាន</span>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                <span className="text-2xl font-black text-amber-600 block mb-1">{lateCount}</span>
-                <span className="text-xs font-bold text-slate-500">យឺត</span>
-              </div>
-
-              <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs col-span-2 sm:col-span-1">
-                <span className="text-2xl font-black text-blue-600 block mb-1">{permissionCount}</span>
-                <span className="text-xs font-bold text-slate-500">ច្បាប់</span>
-              </div>
-            </div>
-
-            <div className="relative max-w-sm">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-              <input
-                type="text"
-                placeholder="ស្វែងរកឈ្មោះសិស្ស..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-blue-600 font-semibold"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredList.map((st, i) => (
-                <div
-                  key={st.id}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
-                          {i + 1}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
-                            {st.name}
-                          </h4>
-                          <p className="text-xs text-slate-400 font-mono truncate">
-                            {st.telegram || st.phoneNumber || `student_${i + 1}`}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEditInit(st)}
-                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="កែប្រែ"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteStudent(st.id, st.name)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="លុប"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => updateAttendanceStatus(st.id, "Present")}
-                        className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                          st.status === "Present"
-                            ? "bg-emerald-600 text-white shadow-xs"
-                            : "text-emerald-700 hover:bg-emerald-50"
-                        }`}
-                      >
-                        <Check className="w-4 h-4 mb-0.5" />
-                        <span>វត្តមាន</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => updateAttendanceStatus(st.id, "Absent")}
-                        className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                          st.status === "Absent" || st.status === "Absent_No_Permission"
-                            ? "bg-red-600 text-white shadow-xs"
-                            : "text-red-700 hover:bg-red-50"
-                        }`}
-                      >
-                        <X className="w-4 h-4 mb-0.5" />
-                        <span>អវត្តមាន</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => updateAttendanceStatus(st.id, "Late")}
-                        className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                          st.status === "Late"
-                            ? "bg-amber-500 text-white shadow-xs"
-                            : "text-amber-700 hover:bg-amber-50"
-                        }`}
-                      >
-                        <Clock className="w-4 h-4 mb-0.5" />
-                        <span>យឺត</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => updateAttendanceStatus(st.id, "Permission")}
-                        className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                          st.status === "Permission" || st.status === "Absent_Permission"
-                            ? "bg-blue-600 text-white shadow-xs"
-                            : "text-blue-700 hover:bg-blue-50"
-                        }`}
-                      >
-                        <Calendar className="w-4 h-4 mb-0.5" />
-                        <span>ច្បាប់</span>
-                      </button>
-                    </div>
-
-                    <AnimatePresence>
-                      {st.status !== "Present" && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="pt-2 border-t border-slate-100 space-y-1 overflow-hidden mt-2"
-                        >
-                          <label className="block text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
-                            <FileText className="w-3.5 h-3.5 text-blue-600" />
-                            <span>
-                              មូលហេតុ ({st.status === "Absent" || st.status === "Absent_No_Permission" ? "អវត្តមាន" : st.status === "Late" ? "មកយឺត" : "សុំច្បាប់"}) ៖
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="បញ្ចូលមូលហេតុ (ឧ. ឈឺ, ស្ទះផ្លូវ, មានធុរៈ...)"
-                            value={st.absenceNote || ""}
-                            onChange={(e) => {
-                              const newNote = e.target.value;
-                              setAttendance(prev => {
-                                const recordId = `${st.id}-${selectedDate}-${shift}`;
-                                const exists = prev.some(r => r.id === recordId);
-                                if (exists) {
-                                  return prev.map(r => r.id === recordId ? { ...r, absenceNote: newNote } : r);
-                                } else {
-                                  return [...prev, {
-                                    id: recordId,
-                                    studentId: st.id,
-                                    date: selectedDate,
-                                    shift,
-                                    status: st.status,
-                                    absenceNote: newNote
-                                  }];
-                                }
-                              });
-                            }}
-                            onBlur={(e) => updateAbsenceNote(st.id, e.target.value)}
-                            className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 font-semibold text-slate-800 transition-all"
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                  </div>
-                </div>
-              ))}
-            </div>
-
-          </div>
-        )}
-
-        {/* ================= 3. TAB: របាយការណ៍ (REPORTS) ================= */}
+        {/* ================= 📊 4. TAB: របាយការណ៍ (REPORTS) ================= */}
         {activeTab === "reports" && (
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
             
@@ -1082,7 +1180,141 @@ export default function App() {
 
       </div>
 
-      {/* MODAL បំពេញព័ត៌មានសិស្ស */}
+      {/* MODAL កែប្រែព័ត៌មានគណនីគ្រូ (EDIT TEACHER PROFILE MODAL) */}
+      <AnimatePresence>
+        {showProfileEditModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl relative my-8 space-y-4"
+            >
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                  <Edit className="w-5 h-5 text-blue-600" />
+                  <span>កែប្រែព័ត៌មានគណនីគ្រូ</span>
+                </h3>
+                <button onClick={() => setShowProfileEditModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveProfile} className="space-y-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">គោត្តនាម-នាម</label>
+                    <input
+                      type="text"
+                      required
+                      value={editProfileForm.name}
+                      onChange={(e) => setEditProfileForm({ ...editProfileForm, name: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">តួនាទី</label>
+                    <input
+                      type="text"
+                      required
+                      value={editProfileForm.role}
+                      onChange={(e) => setEditProfileForm({ ...editProfileForm, role: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">លេខទូរស័ព្ទ</label>
+                    <input
+                      type="text"
+                      required
+                      value={editProfileForm.phone}
+                      onChange={(e) => setEditProfileForm({ ...editProfileForm, phone: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលារៀន</label>
+                    <input
+                      type="text"
+                      required
+                      value={editProfileForm.schoolName}
+                      onChange={(e) => setEditProfileForm({ ...editProfileForm, schoolName: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">កូដសាលា</label>
+                    <input
+                      type="text"
+                      value={editProfileForm.schoolCode}
+                      onChange={(e) => setEditProfileForm({ ...editProfileForm, schoolCode: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-600 mb-1">ថ្នាក់សិក្សា</label>
+                    <input
+                      type="text"
+                      value={editProfileForm.gradeClass}
+                      onChange={(e) => setEditProfileForm({ ...editProfileForm, gradeClass: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">ទីកន្លែងកំណើត</label>
+                  <input
+                    type="text"
+                    value={editProfileForm.pob}
+                    onChange={(e) => setEditProfileForm({ ...editProfileForm, pob: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">អាសយដ្ឋានបច្ចុប្បន្ន</label>
+                  <input
+                    type="text"
+                    value={editProfileForm.currentAddress}
+                    onChange={(e) => setEditProfileForm({ ...editProfileForm, currentAddress: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:outline-none focus:border-blue-600"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setShowProfileEditModal(false)}
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
+                  >
+                    បោះបង់
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-[#0f2b5c] hover:bg-blue-900 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>រក្សាទុក</span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL បំពេញព័ត៌មានសិស្ស (ADD / EDIT STUDENT MODAL) */}
       <AnimatePresence>
         {showStudentModal && (
           <motion.div
