@@ -37,7 +37,6 @@ import {
   FileText
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift } from "./types";
-import QRCode from "qrcode";
 
 // បញ្ជីសិស្សលំនាំដើម
 const defaultStudentsList: Student[] = [
@@ -231,7 +230,7 @@ const PremiumDatePicker = ({ id, value, onChange, lang, placeholder }: PremiumDa
 
 export default function App() {
   const [lang, setLang] = useState<"km" | "en">("km");
-  const [activeTab, setActiveTab] = useState<"dashboard" | "admin" | "qr" | "sheets">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "admin" | "sheets">("dashboard");
 
   // Core States
   const [students, setStudents] = useState<Student[]>(defaultStudentsList);
@@ -260,9 +259,8 @@ export default function App() {
   };
   const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
 
-  // Auth & QR
+  // Auth State
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
   const triggerToast = (msg: string) => {
     setToast(msg);
@@ -295,26 +293,12 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    const generateQR = async () => {
-      try {
-        const url = `${window.location.origin}${window.location.pathname}?mode=student-checkin&date=${selectedDate}&shift=${shift}`;
-        const dataUrl = await QRCode.toDataURL(url, { width: 300, margin: 1 });
-        setQrCodeDataUrl(dataUrl);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    generateQR();
-  }, [selectedDate, shift]);
-
   // រក្សាទុកវត្តមាន
   const updateAttendanceStatus = async (studentId: string, newStatus: AttendanceStatus) => {
     const recordId = `${studentId}-${selectedDate}-${shift}`;
     const now = new Date();
     const formattedTime = `${padDateNumber(now.getHours())}:${padDateNumber(now.getMinutes())}`;
 
-    // រក្សាទុកមូលហេតុចាស់ប្រសិនបើមាន
     const existingRec = attendance.find(r => r.id === recordId);
 
     const newRecord: AttendanceRecord = {
@@ -324,7 +308,6 @@ export default function App() {
       shift,
       status: newStatus,
       checkInTime: (newStatus === "Present" || newStatus === "Late") ? formattedTime : "",
-      verifiedByQR: false,
       absenceNote: newStatus === "Present" ? "" : (existingRec?.absenceNote || "")
     };
 
@@ -342,7 +325,7 @@ export default function App() {
     }
   };
 
-  // 🔥 មុខងាររក្សាទុកមូលហេតុ (Save Absence/Late/Permission Reason Note)
+  // រក្សាទុកមូលហេតុ
   const updateAbsenceNote = async (studentId: string, note: string) => {
     const recordId = `${studentId}-${selectedDate}-${shift}`;
     try {
@@ -493,7 +476,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* Tab Navigation */}
+        {/* Tab Navigation (នៅសល់តែ ៣ Tabs) */}
         <nav className="flex space-x-2 bg-white p-1.5 rounded-2xl border border-slate-200/80 shadow-xs mb-6">
           <button
             onClick={() => setActiveTab("dashboard")}
@@ -506,12 +489,6 @@ export default function App() {
             className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${activeTab === "admin" ? "bg-[#0f2b5c] text-white shadow-xs" : "text-slate-500 hover:bg-slate-50"}`}
           >
             {lang === "km" ? "បញ្ជីឈ្មោះសិស្ស" : "Students"}
-          </button>
-          <button
-            onClick={() => setActiveTab("qr")}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${activeTab === "qr" ? "bg-[#0f2b5c] text-white shadow-xs" : "text-slate-500 hover:bg-slate-50"}`}
-          >
-            {lang === "km" ? "កូដ QR" : "QR Code"}
           </button>
           <button
             onClick={() => setActiveTab("sheets")}
@@ -625,7 +602,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* ប៊ូតុងទាំង ៤ វត្តមាន អវត្តមាន យឺត ច្បាប់ */}
                   <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
                     <button
                       type="button"
@@ -680,7 +656,7 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* 🔥 ប្រអប់សរសេរមូលហេតុ (បង្ហាញស្វ័យប្រវត្តិតែពេលជ្រើសរើស អវត្តមាន យឺត ឬ ច្បាប់) */}
+                  {/* ប្រអប់សរសេរមូលហេតុ */}
                   <AnimatePresence>
                     {st.status !== "Present" && (
                       <motion.div
@@ -701,7 +677,6 @@ export default function App() {
                           value={st.absenceNote || ""}
                           onChange={(e) => {
                             const newNote = e.target.value;
-                            // កែប្រែ State ក្នុងម៉ាស៊ីនភ្លាមៗ
                             setAttendance(prev => {
                               const recordId = `${st.id}-${selectedDate}-${shift}`;
                               const exists = prev.some(r => r.id === recordId);
@@ -964,18 +939,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* ================= TAB 3: QR CODE GENERATOR ================= */}
-        {activeTab === "qr" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs text-center space-y-4 max-w-md mx-auto">
-            <h3 className="text-base font-extrabold text-slate-900">កូដ QR សម្រាប់ស្កេនវត្តមាន</h3>
-            {qrCodeDataUrl ? (
-              <img src={qrCodeDataUrl} alt="QR Code" className="w-64 h-64 mx-auto rounded-xl border border-slate-200 p-2" />
-            ) : null}
-            <p className="text-xs text-slate-500">ស្កេនកូដនេះដើម្បីចុះឈ្មោះវត្តមានប្រចាំថ្ងៃ ({shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"})</p>
-          </div>
-        )}
-
-        {/* ================= TAB 4: REPORTS (មានបង្ហាញមូលហេតុ) ================= */}
+        {/* ================= TAB 3: REPORTS ================= */}
         {activeTab === "sheets" && (
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-4 overflow-x-auto">
             <h3 className="text-base font-extrabold text-slate-900">របាយការណ៍សរុបវត្តមាន ({selectedDate} - {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"})</h3>
@@ -1007,7 +971,7 @@ export default function App() {
                         {st.status === "Present" ? "វត្តមាន" : st.status === "Late" ? "យឺត" : st.status === "Permission" ? "ច្បាប់" : "អវត្តមាន"}
                       </span>
                     </td>
-                    <td className="p-2 text-slate-600 italic">
+                    <td className="p-2 text-slate-600 italic font-semibold">
                       {st.absenceNote || "-"}
                     </td>
                   </tr>
@@ -1025,7 +989,7 @@ export default function App() {
           មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម - RTTC Kampong Cham
         </p>
         <p className="text-slate-400 text-[11px]">
-          Copyright © 2026. Classroom Attendance & Geofenced System.
+          Copyright © 2026. Classroom Attendance System.
         </p>
       </footer>
 
