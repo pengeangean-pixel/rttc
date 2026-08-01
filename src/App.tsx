@@ -6,66 +6,42 @@ import {
   query, 
   doc, 
   setDoc, 
-  deleteDoc, 
-  writeBatch 
+  deleteDoc 
 } from "firebase/firestore";
 import {
-  EmailAuthProvider,
-  User as FirebaseUser,
   onAuthStateChanged,
-  reauthenticateWithCredential,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
   signOut,
-  updateEmail,
-  updatePassword,
-  updateProfile
+  User as FirebaseUser
 } from "firebase/auth";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Sparkles, 
   Users, 
-  MapPin, 
   QrCode, 
   CheckCircle, 
-  FileSpreadsheet, 
   Search, 
   Plus, 
   Trash2, 
   Edit, 
-  Download, 
   UserCheck, 
-  Smartphone, 
-  Locate, 
-  User,
-  UserPlus, 
-  Save, 
   Calendar, 
-  Compass, 
-  TrendingUp,
-  ExternalLink, 
-  AlertTriangle,
-  Globe,
-  Settings,
-  X,
-  Check,
+  X, 
+  Check, 
+  LogOut, 
+  Globe, 
+  ChevronLeft, 
+  ChevronRight, 
+  Clock,
+  UserPlus,
+  Save,
+  Building,
   Phone,
   Send,
-  LogOut,
-  LogIn,
-  Lock,
-  Mail,
-  Key,
-  RefreshCw,
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Clock
+  MapPin
 } from "lucide-react";
 import { Student, AttendanceRecord, GeofenceConfig, AttendanceStatus, AttendanceShift } from "./types";
 import QRCode from "qrcode";
 
-// Default Initial Students List fallback
+// បញ្ជីសិស្សលំនាំដើម
 const defaultStudentsList: Student[] = [
   {
     id: "s-101",
@@ -148,10 +124,9 @@ type PremiumDatePickerProps = {
   onChange: (value: string) => void;
   lang: "km" | "en";
   placeholder?: string;
-  className?: string;
 };
 
-const PremiumDatePicker = ({ id, value, onChange, lang, placeholder, className = "" }: PremiumDatePickerProps) => {
+const PremiumDatePicker = ({ id, value, onChange, lang, placeholder }: PremiumDatePickerProps) => {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const selectedDate = value ? parseISODate(value) : new Date();
   const [isOpen, setIsOpen] = useState(false);
@@ -194,7 +169,7 @@ const PremiumDatePicker = ({ id, value, onChange, lang, placeholder, className =
         id={id}
         type="button"
         onClick={() => setIsOpen(prev => !prev)}
-        className={`flex w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-left text-sm font-semibold text-slate-800 shadow-xs transition-all hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${className}`}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-left text-sm font-semibold text-slate-800 shadow-xs hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
       >
         <span>{value ? value.split("-").reverse().join("/") : (placeholder || "01/08/2026")}</span>
         <Calendar className="h-4 w-4 text-slate-400" />
@@ -263,7 +238,7 @@ export default function App() {
   const [lang, setLang] = useState<"km" | "en">("km");
   const [activeTab, setActiveTab] = useState<"dashboard" | "admin" | "qr" | "sheets">("dashboard");
 
-  // Core Data States
+  // Core States
   const [students, setStudents] = useState<Student[]>(defaultStudentsList);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
@@ -271,32 +246,42 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  // Auth States
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [inputEmail, setInputEmail] = useState("");
-  const [inputPassword, setInputPassword] = useState("");
+  // Student Form & Modal States (សម្រាប់បន្ថែមកែប្រែសិស្ស)
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const emptyStudentForm: Omit<Student, "id"> = {
+    name: "",
+    gender: "ប្រុស",
+    dob: "2004-01-01",
+    profilePhoto: "",
+    phoneNumber: "",
+    telegram: "",
+    schoolName: "",
+    address: "",
+    village: "",
+    commune: "",
+    district: "",
+    province: "",
+    isMonitor: false
+  };
+  const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
 
-  // QR Code & Geofence
+  // Auth & QR States
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
-  const [geofence, setGeofence] = useState<GeofenceConfig>({
-    latitude: 12.0004658,
-    longitude: 105.4645,
-    radius: 150,
-    isEnabled: true
-  });
 
   const triggerToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Firebase Auth Observer
+  // Auth Observer
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => setFirebaseUser(user));
     return () => unsub();
   }, []);
 
-  // Firebase Firestore Realtime Sync
+  // Firestore Live Listener
   useEffect(() => {
     const qStudents = query(collection(db, "students"));
     const unsubStudents = onSnapshot(qStudents, (snap) => {
@@ -318,11 +303,11 @@ export default function App() {
     };
   }, []);
 
-  // Generate QR Code
+  // QR Code Generation
   useEffect(() => {
     const generateQR = async () => {
       try {
-        const url = `${window.location.origin}${window.location.pathname}?mode=student-checkin&date=${selectedDate}`;
+        const url = `${window.location.origin}${window.location.pathname}?mode=student-checkin&date=${selectedDate}&shift=${shift}`;
         const dataUrl = await QRCode.toDataURL(url, { width: 300, margin: 1 });
         setQrCodeDataUrl(dataUrl);
       } catch (err) {
@@ -330,12 +315,11 @@ export default function App() {
       }
     };
     generateQR();
-  }, [selectedDate, geofence]);
+  }, [selectedDate, shift]);
 
-  // Update Attendance Function (Direct status change to Firebase)
+  // 🔥 បង្កើត KEY ដោយរ៉ាប់បញ្ចូលទាំង (studentId + date + shift) ដើម្បីបំបែកទិន្នន័យតាមវេន និងតាមថ្ងៃ!
   const updateAttendanceStatus = async (studentId: string, newStatus: AttendanceStatus) => {
-    const todayStr = selectedDate;
-    const recordId = `${studentId}-${todayStr}`;
+    const recordId = `${studentId}-${selectedDate}-${shift}`;
     
     const now = new Date();
     const formattedTime = `${padDateNumber(now.getHours())}:${padDateNumber(now.getMinutes())}`;
@@ -343,7 +327,7 @@ export default function App() {
     const newRecord: AttendanceRecord = {
       id: recordId,
       studentId,
-      date: todayStr,
+      date: selectedDate,
       shift,
       status: newStatus,
       checkInTime: (newStatus === "Present" || newStatus === "Late") ? formattedTime : "",
@@ -352,22 +336,24 @@ export default function App() {
 
     try {
       await setDoc(doc(db, "attendance", recordId), removeUndefinedFields(newRecord), { merge: true });
-      triggerToast(lang === "km" ? "បានកែប្រែវត្តមានរួចរាល់" : "Attendance updated");
+      const shiftText = shift === "morning" ? "វេនព្រឹក" : shift === "noon" ? "វេនថ្ងៃត្រង់" : "វេនរសៀល";
+      triggerToast(`បានកត់ត្រាវត្តមាន (${shiftText}) រួចរាល់!`);
     } catch (err) {
-      console.error("Error saving to cloud:", err);
-      // Fallback local update
+      console.error("Error saving to Firestore:", err);
+      // Fallback Local Update
       setAttendance(prev => {
         const exists = prev.some(r => r.id === recordId);
         return exists ? prev.map(r => r.id === recordId ? { ...r, status: newStatus } : r) : [...prev, newRecord];
       });
-      triggerToast(lang === "km" ? "បានកត់ត្រាក្នុងម៉ាស៊ីន" : "Saved locally");
+      triggerToast("បានរក្សាទុកក្នុងម៉ាស៊ីន (Offline)");
     }
   };
 
-  // Get status for today
+  // ទាញយកវត្តមានសិស្សតាម Date និង Shift បច្ចុប្បន្ន
   const getDailyList = () => {
     return students.map(st => {
-      const rec = attendance.find(r => r.studentId === st.id && r.date === selectedDate);
+      const recordId = `${st.id}-${selectedDate}-${shift}`;
+      const rec = attendance.find(r => r.id === recordId);
       return {
         ...st,
         status: (rec ? rec.status : "Present") as AttendanceStatus,
@@ -376,10 +362,77 @@ export default function App() {
     });
   };
 
+  // រក្សាទុកព័ត៌មានសិស្សថ្មី ឬ កែប្រែសិស្ស (Add / Edit Student)
+  const handleSaveStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!studentForm.name || !studentForm.phoneNumber) {
+      triggerToast("សូមបំពេញឈ្មោះ និងលេខទូរស័ព្ទសិស្ស!");
+      return;
+    }
+
+    try {
+      if (editingStudentId) {
+        // Edit Mode
+        const updatedStudent: Student = { id: editingStudentId, ...studentForm };
+        await setDoc(doc(db, "students", editingStudentId), removeUndefinedFields(updatedStudent));
+        setStudents(prev => prev.map(s => s.id === editingStudentId ? updatedStudent : s));
+        triggerToast("បានកែប្រែព័ត៌មានសិស្សជោគជ័យ!");
+      } else {
+        // Add Mode
+        const newId = `s-${Date.now()}`;
+        const newStudent: Student = { id: newId, ...studentForm };
+        await setDoc(doc(db, "students", newId), removeUndefinedFields(newStudent));
+        setStudents(prev => [...prev, newStudent]);
+        triggerToast("បានបន្ថែមសិស្សថ្មីជោគជ័យ!");
+      }
+
+      setShowStudentModal(false);
+      setEditingStudentId(null);
+      setStudentForm(emptyStudentForm);
+    } catch (err) {
+      console.error("Error saving student:", err);
+      triggerToast("មានបញ្ហាក្នុងការរក្សាទុកទិន្នន័យសិស្ស");
+    }
+  };
+
+  // លុបឈ្មោះសិស្ស
+  const handleDeleteStudent = async (id: string, name: string) => {
+    if (!window.confirm(`តើអ្នកពិតជាចង់លុបសិស្សឈ្មោះ "${name}" មែនទេ?`)) return;
+    try {
+      await deleteDoc(doc(db, "students", id));
+      setStudents(prev => prev.filter(s => s.id !== id));
+      triggerToast("បានលុបសិស្សចេញពីប្រព័ន្ធ!");
+    } catch (err) {
+      console.error(err);
+      triggerToast("មានបញ្ហាក្នុងការលុបសិស្ស");
+    }
+  };
+
+  // កែប្រែសិស្ស (Open Edit Modal)
+  const handleEditInit = (st: Student) => {
+    setEditingStudentId(st.id);
+    setStudentForm({
+      name: st.name,
+      gender: st.gender,
+      dob: st.dob,
+      profilePhoto: st.profilePhoto || "",
+      phoneNumber: st.phoneNumber,
+      telegram: st.telegram,
+      schoolName: st.schoolName || "",
+      address: st.address || "",
+      village: st.village || "",
+      commune: st.commune || "",
+      district: st.district || "",
+      province: st.province || "",
+      isMonitor: !!st.isMonitor
+    });
+    setShowStudentModal(true);
+  };
+
   const dailyList = getDailyList();
   const filteredList = dailyList.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // Stats Counters
+  // ស្ថិតិវត្តមាន
   const totalCount = students.length;
   const presentCount = dailyList.filter(s => s.status === "Present").length;
   const absentCount = dailyList.filter(s => s.status === "Absent" || s.status === "Absent_No_Permission").length;
@@ -387,9 +440,9 @@ export default function App() {
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9] text-slate-800 font-sans">
+    <div className="min-h-screen bg-[#f1f5f9] text-slate-800 font-sans pb-12">
       
-      {/* Dynamic Toast Feedback */}
+      {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
           <motion.div 
@@ -406,7 +459,7 @@ export default function App() {
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         
-        {/* Main App Navigation Header */}
+        {/* App Header */}
         <header className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-[#0f2b5c] text-white rounded-xl shadow-xs">
@@ -431,7 +484,7 @@ export default function App() {
               {lang === "km" ? "English" : "ភាសាខ្មែរ"}
             </button>
 
-            {firebaseUser ? (
+            {firebaseUser && (
               <button
                 onClick={() => signOut(auth)}
                 className="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
@@ -439,7 +492,7 @@ export default function App() {
                 <LogOut className="w-3.5 h-3.5" />
                 {lang === "km" ? "ចាកចេញ" : "Logout"}
               </button>
-            ) : null}
+            )}
           </div>
         </header>
 
@@ -471,17 +524,21 @@ export default function App() {
           </button>
         </nav>
 
-        {/* ================= TAB 1: MAIN DASHBOARD (EXACT MATCH TO YOUR IMAGE) ================= */}
+        {/* ================= TAB 1: MAIN DASHBOARD ================= */}
         {activeTab === "dashboard" && (
           <div className="space-y-5">
             
-            {/* Header Title Section */}
-            <div className="flex items-center gap-2 text-[#0f2b5c]">
-              <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
-              <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស</h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[#0f2b5c]">
+                <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
+                <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស</h2>
+              </div>
+              <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
+                {shift === "morning" ? "វេនព្រឹក" : shift === "noon" ? "វេនថ្ងៃត្រង់" : "វេនរសៀល"}
+              </span>
             </div>
 
-            {/* Date & Shift Selectors */}
+            {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន (Date & Shift Controls) */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">
@@ -511,7 +568,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Horizontal 5-Box Stats Bar */}
+            {/* របារបង្ហាញស្ថិតិ ៥ ប្រអប់ */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
                 <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
@@ -539,7 +596,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Search Filter Bar */}
+            {/* ស្វែងរកសិស្ស */}
             <div className="relative max-w-sm">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               <input
@@ -551,14 +608,13 @@ export default function App() {
               />
             </div>
 
-            {/* Student Cards Grid (Matching image layout) */}
+            {/* កាតសិស្ស និងប៊ូតុងចុចវត្តមានទាំង ៤ */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredList.map((st, i) => (
                 <div
                   key={st.id}
                   className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-4 hover:shadow-md transition-all"
                 >
-                  {/* Circle Badge + Student Name */}
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
                       {i + 1}
@@ -573,9 +629,7 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* 4 Attendance Action Buttons */}
                   <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
-                    {/* វត្តមាន */}
                     <button
                       type="button"
                       onClick={() => updateAttendanceStatus(st.id, "Present")}
@@ -589,7 +643,6 @@ export default function App() {
                       <span>វត្តមាន</span>
                     </button>
 
-                    {/* អវត្តមាន */}
                     <button
                       type="button"
                       onClick={() => updateAttendanceStatus(st.id, "Absent")}
@@ -603,7 +656,6 @@ export default function App() {
                       <span>អវត្តមាន</span>
                     </button>
 
-                    {/* យឺត */}
                     <button
                       type="button"
                       onClick={() => updateAttendanceStatus(st.id, "Late")}
@@ -617,7 +669,6 @@ export default function App() {
                       <span>យឺត</span>
                     </button>
 
-                    {/* ច្បាប់ */}
                     <button
                       type="button"
                       onClick={() => updateAttendanceStatus(st.id, "Permission")}
@@ -638,23 +689,253 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 2: ADMIN STUDENT ROSTER ================= */}
+        {/* ================= TAB 2: បញ្ជីឈ្មោះសិស្ស និងកន្លែងបំពេញព័ត៌មាន (ADMIN & STUDENT FORM) ================= */}
         {activeTab === "admin" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
-            <h3 className="text-base font-extrabold text-slate-900">បញ្ជីឈ្មោះសិស្សសរុប ({students.length})</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">បញ្ជីឈ្មោះសិស្សសរុប ({students.length} នាក់)</h3>
+                <p className="text-xs text-slate-500 mt-0.5">គ្រប់គ្រង បន្ថែម ឬកែប្រែព័ត៌មានលម្អិតរបស់សិស្ស</p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setEditingStudentId(null);
+                  setStudentForm(emptyStudentForm);
+                  setShowStudentModal(true);
+                }}
+                className="px-4 py-2.5 bg-[#0f2b5c] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
+              >
+                <Plus className="w-4 h-4 text-emerald-400" />
+                <span>+ បញ្ចូលសិស្សថ្មី</span>
+              </button>
+            </div>
+
+            {/* បញ្ជីសិស្សបង្ហាញជាកាត */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {students.map((st, i) => (
-                <div key={st.id} className="p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center justify-between">
+                <div key={st.id} className="p-4 border border-slate-200 rounded-2xl bg-slate-50/50 hover:bg-white hover:shadow-xs transition-all flex flex-col justify-between space-y-3">
                   <div>
-                    <span className="font-bold text-slate-800 text-sm block">{i + 1}. {st.name}</span>
-                    <span className="text-xs text-slate-400 font-mono">{st.phoneNumber} | {st.telegram}</span>
+                    <div className="flex justify-between items-start">
+                      <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                        {i + 1}. {st.name}
+                        {st.isMonitor && (
+                          <span className="text-[9px] bg-amber-500 text-slate-900 px-1.5 py-0.5 rounded font-black">ប្រធាន</span>
+                        )}
+                      </h4>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${st.gender === "ស្រី" || st.gender === "Female" ? "bg-pink-100 text-pink-700" : "bg-blue-100 text-blue-700"}`}>
+                        {st.gender}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 space-y-1 text-xs text-slate-500 font-sans">
+                      <p className="flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="font-mono text-slate-700">{st.phoneNumber || "-"}</span>
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        <Send className="w-3.5 h-3.5 text-blue-500" />
+                        <span className="font-mono text-blue-600 font-bold">{st.telegram || "-"}</span>
+                      </p>
+                      <p className="flex items-center gap-1.5">
+                        <Building className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{st.schoolName || "-"}</span>
+                      </p>
+                      <p className="flex items-center gap-1.5 text-[11px] italic text-slate-400">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{[st.village, st.commune, st.district, st.province].filter(Boolean).join(" ") || st.address || "-"}</span>
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold text-slate-500">{st.gender}</span>
+
+                  {/* ប៊ូតុង Edit & Delete */}
+                  <div className="flex gap-2 pt-2 border-t border-slate-200/60 justify-end">
+                    <button
+                      onClick={() => handleEditInit(st)}
+                      className="px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50 rounded-lg flex items-center gap-1 transition-colors"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      <span>កែប្រែ</span>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStudent(st.id, st.name)}
+                      className="px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>លុប</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
+
           </div>
         )}
+
+        {/* MODAL បំពេញព័ត៌មានសិស្ស (ADD / EDIT STUDENT MODAL) */}
+        <AnimatePresence>
+          {showStudentModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
+            >
+              <motion.div
+                initial={{ scale: 0.95, y: 15 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 15 }}
+                className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl relative my-8 space-y-4"
+              >
+                <div className="flex items-center justify-between border-b pb-3">
+                  <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                    <UserPlus className="w-5 h-5 text-blue-600" />
+                    <span>{editingStudentId ? "កែប្រែព័ត៌មានសិស្ស" : "បញ្ចូលព័ត៌មានសិស្សថ្មី"}</span>
+                  </h3>
+                  <button onClick={() => setShowStudentModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSaveStudent} className="space-y-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសិស្ស *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="ឧ. ធឿន ផានិត"
+                        value={studentForm.name}
+                        onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-1">ភេទ</label>
+                      <select
+                        value={studentForm.gender}
+                        onChange={(e) => setStudentForm({ ...studentForm, gender: e.target.value as "ប្រុស" | "ស្រី" })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
+                      >
+                        <option value="ប្រុស">ប្រុស</option>
+                        <option value="ស្រី">ស្រី</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-1">លេខទូរស័ព្ទ *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="0961122334"
+                        value={studentForm.phoneNumber}
+                        onChange={(e) => setStudentForm({ ...studentForm, phoneNumber: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-1">Telegram (Username)</label>
+                      <input
+                        type="text"
+                        placeholder="@phanitkrn"
+                        value={studentForm.telegram}
+                        onChange={(e) => setStudentForm({ ...studentForm, telegram: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-mono focus:outline-none focus:border-blue-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-1">ថ្ងៃខែឆ្នាំកំណើត</label>
+                      <input
+                        type="date"
+                        value={studentForm.dob}
+                        onChange={(e) => setStudentForm({ ...studentForm, dob: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលារៀន</label>
+                      <input
+                        type="text"
+                        placeholder="វិទ្យាល័យកំពង់ចាម"
+                        value={studentForm.schoolName}
+                        onChange={(e) => setStudentForm({ ...studentForm, schoolName: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* អាសយដ្ឋាន */}
+                  <div className="pt-2 border-t space-y-2">
+                    <label className="block font-bold text-slate-700">អាសយដ្ឋានរស់នៅ</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="ភូមិ"
+                        value={studentForm.village}
+                        onChange={(e) => setStudentForm({ ...studentForm, village: e.target.value })}
+                        className="px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="ឃុំ / សង្កាត់"
+                        value={studentForm.commune}
+                        onChange={(e) => setStudentForm({ ...studentForm, commune: e.target.value })}
+                        className="px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="ស្រុក / ក្រុង"
+                        value={studentForm.district}
+                        onChange={(e) => setStudentForm({ ...studentForm, district: e.target.value })}
+                        className="px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                      />
+                      <input
+                        type="text"
+                        placeholder="ខេត្ត"
+                        value={studentForm.province}
+                        onChange={(e) => setStudentForm({ ...studentForm, province: e.target.value })}
+                        className="px-3 py-2 rounded-xl border border-slate-300 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="chk-monitor"
+                      checked={studentForm.isMonitor}
+                      onChange={(e) => setStudentForm({ ...studentForm, isMonitor: e.target.checked })}
+                      className="w-4 h-4 text-blue-600 rounded cursor-pointer"
+                    />
+                    <label htmlFor="chk-monitor" className="font-bold text-slate-700 cursor-pointer">ជាប្រធានថ្នាក់ (Class Monitor)</label>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4 border-t">
+                    <button
+                      type="button"
+                      onClick={() => setShowStudentModal(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
+                    >
+                      បោះបង់
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-[#0f2b5c] hover:bg-blue-900 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>រក្សាទុក</span>
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ================= TAB 3: QR CODE GENERATOR ================= */}
         {activeTab === "qr" && (
@@ -663,14 +944,14 @@ export default function App() {
             {qrCodeDataUrl ? (
               <img src={qrCodeDataUrl} alt="QR Code" className="w-64 h-64 mx-auto rounded-xl border border-slate-200 p-2" />
             ) : null}
-            <p className="text-xs text-slate-500">ស្កេនកូដនេះដើម្បីចុះឈ្មោះវត្តមានប្រចាំថ្ងៃ</p>
+            <p className="text-xs text-slate-500">ស្កេនកូដនេះដើម្បីចុះឈ្មោះវត្តមានប្រចាំថ្ងៃ ({shift === "morning" ? "វេនព្រឹក" : shift === "noon" ? "វេនថ្ងៃត្រង់" : "វេនរសៀល"})</p>
           </div>
         )}
 
         {/* ================= TAB 4: REPORTS ================= */}
         {activeTab === "sheets" && (
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-4 overflow-x-auto">
-            <h3 className="text-base font-extrabold text-slate-900">របាយការណ៍សរុបវត្តមានថ្ងៃនេះ</h3>
+            <h3 className="text-base font-extrabold text-slate-900">របាយការណ៍សរុបវត្តមាន ({selectedDate} - {shift === "morning" ? "វេនព្រឹក" : shift === "noon" ? "វេនថ្ងៃត្រង់" : "វេនរសៀល"})</h3>
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-100 border-b text-slate-600 font-bold">
