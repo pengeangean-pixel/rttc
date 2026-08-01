@@ -26,6 +26,7 @@ import {
   X, 
   Check, 
   LogOut, 
+  Globe, 
   ChevronLeft, 
   ChevronRight, 
   Clock,
@@ -52,7 +53,8 @@ import {
   CheckSquare,
   Square,
   LogIn,
-  Sparkles
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile, CurrentUser } from "./types";
 import QRCode from "qrcode";
@@ -270,13 +272,16 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loginRoleTab, setLoginRoleTab] = useState<"admin" | "student">("student");
   
-  // 🔥 MODAL សួរបញ្ជាក់ការចាកចេញ (Logout Confirm Modal)
+  // MODAL សួរបញ្ជាក់ការចាកចេញ
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
 
   // Inputs Login
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPass, setAdminPass] = useState("");
   const [studentInputQuery, setStudentInputQuery] = useState("");
+
+  // 🔥 State បង្ហាញ ឬបិទលេខសម្ងាត់ (Show/Hide Password Toggle)
+  const [showPassword, setShowPassword] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"home" | "account" | "students" | "reports">("home");
 
@@ -423,13 +428,14 @@ export default function App() {
     }
   };
 
-  // 🔥 មុខងារ LOGOUT បន្ទាប់ពីចុចសួរបញ្ជាក់
+  // LOGOUT
   const handleLogoutUser = () => {
     signOut(auth);
     setCurrentUser(null);
     setAdminEmail("");
     setAdminPass("");
     setStudentInputQuery("");
+    setShowPassword(false);
     triggerToast("បានចាកចេញពីប្រព័ន្ធ!");
   };
 
@@ -763,7 +769,7 @@ export default function App() {
   const lateCount = dailyList.filter(s => s.status === "Late").length;
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
 
-  // ================= 🚪 SCREEN USER LOGIN VIEW (ប្រសិនបើមិនទាន់ LOG IN) =================
+  // ================= 🚪 SCREEN USER LOGIN VIEW =================
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#0f2b5c] flex items-center justify-center p-4 font-sans">
@@ -831,7 +837,7 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogIn className="w-4 h-4 text-amber-400" />
                 <span>ចូលមើលវត្តមានផ្ទាល់ខ្លួន</span>
@@ -839,7 +845,7 @@ export default function App() {
             </form>
           )}
 
-          {/* Form 2: Admin Login */}
+          {/* Form 2: Admin Login (មានប៊ូតុងបង្ហាញ/បិទលេខសម្ងាត់) */}
           {loginRoleTab === "admin" && (
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-1">
@@ -862,24 +868,34 @@ export default function App() {
                 </div>
               </div>
 
+              {/* 🔥 លេខសម្ងាត់ ( password toggle eye icon ) */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">លេខសម្ងាត់ (Password) *</label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     placeholder="••••••••"
                     value={adminPass}
                     onChange={(e) => setAdminPass(e.target.value)}
-                    className="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
+                    className="w-full pl-9 pr-10 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
                   />
+                  {/* ប៊ូតុងរូបភ្នែក Toggle */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(prev => !prev)}
+                    className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    title={showPassword ? "បិទលេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogIn className="w-4 h-4 text-emerald-400" />
                 <span>ចូលប្រព័ន្ធ Admin</span>
@@ -938,10 +954,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* 🔥 ប៊ូតុងចាកចេញ (ជាមួយ Modal សួរបញ្ជាក់) */}
+            {/* ប៊ូតុងចាកចេញ (ជាមួយ Modal សួរបញ្ជាក់) */}
             <button
               onClick={() => setShowLogoutConfirmModal(true)}
-              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-red-200/80 shadow-2xs"
+              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-red-200/80 shadow-2xs cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
               <span>ចាកចេញ</span>
@@ -1084,7 +1100,7 @@ export default function App() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
         
-        {/* 🔝 TOP NAVIGATION BAR (ជំនួសប៊ូតុងភាសា ដោយប៊ូតុងចាកចេញពណ៌ក្រហម) */}
+        {/* 🔝 TOP NAVIGATION BAR (ប៊ូតុងចាកចេញ) */}
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           
           <nav className="flex space-x-1.5 w-full sm:w-auto overflow-x-auto">
