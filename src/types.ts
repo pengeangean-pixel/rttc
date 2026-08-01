@@ -30,8 +30,23 @@ export interface AttendanceRecord {
   id: string; // studentId + "-" + date + "-" + shift
   studentId: string;
   date: string; // YYYY-MM-DD
-  shift?: AttendanceShift; // "morning" | "afternoon"
+  shift?: AttendanceShift;
   status: AttendanceStatus;
   checkInTime?: string;
   absenceNote?: string;
+}
+
+export interface UserProfile {
+  name: string;
+  role: string;
+  username: string;
+  gender: string;
+  dob: string;
+  phone: string;
+  nationality: string;
+  pob: string;
+  currentAddress: string;
+  schoolName: string;
+  schoolCode: string;
+  gradeClass: string;
 }
