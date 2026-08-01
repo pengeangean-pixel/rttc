@@ -6,7 +6,8 @@ import {
   query, 
   doc, 
   setDoc, 
-  deleteDoc 
+  deleteDoc,
+  writeBatch 
 } from "firebase/firestore";
 import {
   onAuthStateChanged,
@@ -46,7 +47,9 @@ import {
   Key,
   QrCode,
   GraduationCap,
-  Home
+  FileSpreadsheet,
+  Sparkles,
+  Upload
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile } from "./types";
 import QRCode from "qrcode";
@@ -61,61 +64,12 @@ const initialProfile: UserProfile = {
   phone: "0886722609",
   nationality: "ខ្មែរ | ខ្មែរ",
   pob: "ផ្ទះ១, ទួលព្រះឃ្លាំង, ស្ទឹងត្រង់, ខេត្តកំពង់ចាម",
-  currentAddress: "ក្តុលផ្សារ, ទន្លូង, មេមត់, ខេត្តត្បូងឃ្មុំ",
+  currentAddress: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolCode: "25101401064",
   gradeClass: "ថ្នាក់ទី ៣គ (គ)",
   profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
 };
-
-// បញ្ជីសិស្សលំនាំដើម
-const defaultStudentsList: Student[] = [
-  {
-    id: "s-101",
-    name: "ធឿន ផានិត",
-    gender: "ប្រុស",
-    dob: "2004-10-14",
-    profilePhoto: "",
-    schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
-    phoneNumber: "0961122334",
-    telegram: "phanitkrn",
-    address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
-    village: "ក្តុលផ្សារ",
-    commune: "ទន្លូង",
-    district: "មេមត់",
-    province: "ខេត្តត្បូងឃ្មុំ"
-  },
-  {
-    id: "s-102",
-    name: "ចិត្រា វ៉ារិន",
-    gender: "ប្រុស",
-    dob: "2003-05-18",
-    profilePhoto: "",
-    schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
-    phoneNumber: "0968877661",
-    telegram: "varinchitra",
-    address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
-    village: "ក្តុលផ្សារ",
-    commune: "ទន្លូង",
-    district: "មេមត់",
-    province: "ខេត្តត្បូងឃ្មុំ"
-  },
-  {
-    id: "s-103",
-    name: "ធឿន ទី",
-    gender: "ប្រុស",
-    dob: "2004-08-05",
-    profilePhoto: "",
-    schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
-    phoneNumber: "0889988772",
-    telegram: "tichn",
-    address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
-    village: "ក្តុលផ្សារ",
-    commune: "ទន្លូង",
-    district: "មេមត់",
-    province: "ខេត្តត្បូងឃ្មុំ"
-  }
-];
 
 const removeUndefinedFields = <T extends object>(data: T) => {
   return Object.fromEntries(
@@ -260,13 +214,11 @@ const PremiumDatePicker = ({ id, value, onChange, lang, placeholder }: PremiumDa
 
 export default function App() {
   const [lang, setLang] = useState<"km" | "en">("km");
-  
-  // បើកមកបង្ហាញ Tab "home" ដំបូងគេ
   const [activeTab, setActiveTab] = useState<"home" | "account" | "students" | "reports">("home");
 
   // Core States
   const [userProfile, setUserProfile] = useState<UserProfile>(initialProfile);
-  const [students, setStudents] = useState<Student[]>(defaultStudentsList);
+  const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
   const [shift, setShift] = useState<AttendanceShift>("morning");
@@ -276,6 +228,9 @@ export default function App() {
   // Edit Teacher Profile Modal State
   const [showProfileEditModal, setShowProfileEditModal] = useState(false);
   const [editProfileForm, setEditProfileForm] = useState<UserProfile>(initialProfile);
+
+  // CSV Bulk Import Modal
+  const [showCSVModal, setShowCSVModal] = useState(false);
 
   // Student Form & Modal
   const [showStudentModal, setShowStudentModal] = useState(false);
@@ -296,11 +251,12 @@ export default function App() {
   };
   const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
 
-  // Auth State
+  // Auth State & QR
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
 
   const triggerToast = (msg: string) => {
     setToast(msg);
@@ -326,12 +282,15 @@ export default function App() {
     generateUserQR();
   }, [userProfile]);
 
+  // 🔥 Sync គរុនិស្សិតពី Firestore
   useEffect(() => {
     const qStudents = query(collection(db, "students"));
     const unsubStudents = onSnapshot(qStudents, (snap) => {
       const list: Student[] = [];
       snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() } as Student));
-      if (list.length > 0) setStudents(list);
+      if (list.length > 0) {
+        setStudents(list);
+      }
     });
 
     const qAttendance = query(collection(db, "attendance"));
@@ -347,7 +306,52 @@ export default function App() {
     };
   }, []);
 
-  // មុខងារប្ដូររូបភាព Profile (ត្រួតពិនិត្យមិនឱ្យលើសពី 2MB)
+  // ⚡ មុខងារបង្កើតទិន្នន័យគរុនិស្សិត ២១២ នាក់ស្វ័យប្រវត្តិ (Auto-Generate 212 Trainees)
+  const handleGenerate212Students = async () => {
+    if (!window.confirm("តើអ្នកពិតជាចង់បង្កើតបញ្ជីឈ្មោះគរុនិស្សិតចំនួន ២១២ នាក់ចូលក្នុងប្រព័ន្ធមែនទេ?")) return;
+    
+    const khmerFirstNames = ["សុខ", "លី", "ធឿន", "ចិត្រា", "កែវ", "ហេង", "មុន្នី", "ចាន់", "រតនៈ", "វ៉ាន់", "សុភក្ត្រ", "គឹម", "អ៊ាន", "ផានិត", "ម៉េង", "សិលា"];
+    const khmerLastNames = ["ផានិត", "វ៉ារិន", "ទី", "រ៉ា", "ដារ៉ា", "វឌ្ឍនៈ", "ពិសិដ្ឋ", "សម្បត្តិ", "វិបុល", "ចិន្តា", "សុខា", "ស្រីណុច", "បូរ៉ា", "ម៉ានិត", "នាថ"];
+    
+    const generatedList: Student[] = [];
+    for (let i = 1; i <= 212; i++) {
+      const fName = khmerFirstNames[i % khmerFirstNames.length];
+      const lName = khmerLastNames[(i * 3) % khmerLastNames.length];
+      const gender = i % 3 === 0 ? "ស្រី" : "ប្រុស";
+      
+      generatedList.push({
+        id: `rttc-${String(i).padStart(3, "0")}`,
+        name: `${fName} ${lName}`,
+        gender: gender as "ប្រុស" | "ស្រី",
+        dob: "2004-05-10",
+        phoneNumber: `096${String(1000000 + i).slice(0, 7)}`,
+        telegram: `trainee_${i}`,
+        schoolName: userProfile.schoolName,
+        address: "ខេត្តកំពង់ចាម",
+        village: "ភូមិវាល",
+        commune: "ឃុំព្រៃឈរ",
+        district: "ស្រុកព្រៃឈរ",
+        province: "ខេត្តកំពង់ចាម"
+      });
+    }
+
+    try {
+      // រក្សាទុកចូល Firestore តាម Batch
+      const batch = writeBatch(db);
+      generatedList.forEach(st => {
+        batch.set(doc(db, "students", st.id), removeUndefinedFields(st));
+      });
+      await batch.commit();
+      setStudents(generatedList);
+      triggerToast("បានបង្កើតគរុនិស្សិតចំនួន ២១២ នាក់ចូលក្នុង Firestore ជោគជ័យ!");
+    } catch (err) {
+      console.error(err);
+      setStudents(generatedList);
+      triggerToast("បានបង្កើតគរុនិស្សិតចំនួន ២១២ នាក់ក្នុងប្រព័ន្ធ!");
+    }
+  };
+
+  // Upload រូប Profile មិនលើស 2MB
   const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -362,7 +366,7 @@ export default function App() {
     reader.onload = () => {
       const result = reader.result as string;
       setUserProfile(prev => ({ ...prev, profilePhoto: result }));
-      triggerToast("បានផ្លាស់ប្តូររូបភាព Profile រួចរាល់!");
+      triggerToast("បានផ្លាស់ប្តូររូបភាព Profile រក្សាទុកជោគជ័យ!");
     };
     reader.readAsDataURL(file);
   };
@@ -485,7 +489,6 @@ export default function App() {
     setShowStudentModal(true);
   };
 
-  // រក្សាទុកការកែប្រែព័ត៌មានគ្រូ
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     setUserProfile(editProfileForm);
@@ -493,7 +496,6 @@ export default function App() {
     triggerToast("បានរក្សាទុកការកែប្រែព័ត៌មានគណនី!");
   };
 
-  // ទាញយករាយការណ៍ Excel / CSV
   const handleDownloadReport = () => {
     const BOM = "\uFEFF";
     const headers = ["ល.រ", "ឈ្មោះសិស្ស", "ភេទ", "ថ្ងៃខែឆ្នាំកំណើត", "លេខទូរស័ព្ទ", "Telegram", "ស្ថានភាពវត្តមាន", "មូលហេតុ", "កាលបរិច្ឆេទ", "វេន"];
@@ -526,7 +528,11 @@ export default function App() {
   };
 
   const dailyList = getDailyList();
-  const filteredList = dailyList.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredList = dailyList.filter(s => 
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    s.phoneNumber.includes(searchQuery) ||
+    s.telegram.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const totalCount = students.length;
   const presentCount = dailyList.filter(s => s.status === "Present").length;
@@ -534,13 +540,13 @@ export default function App() {
   const lateCount = dailyList.filter(s => s.status === "Late").length;
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
 
-  // Component បង្ហាញ Dashboard វត្តមានសិស្ស
+  // Component Dashboard
   const AttendanceDashboardComponent = () => (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-[#0f2b5c]">
           <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
-          <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស</h2>
+          <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
         </div>
         <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
           {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
@@ -609,7 +615,7 @@ export default function App() {
         <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
         <input
           type="text"
-          placeholder="ស្វែងរកឈ្មោះសិស្ស..."
+          placeholder="ស្វែងរកឈ្មោះ, លេខទូរស័ព្ទ..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-blue-600 font-semibold"
@@ -617,7 +623,7 @@ export default function App() {
       </div>
 
       {/* កាតសិស្ស */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
         {filteredList.map((st, i) => (
           <div
             key={st.id}
@@ -766,7 +772,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
       
-      {/* Hidden File Input សម្រាប់ Upload រូប Profile មិនលើស 2MB */}
+      {/* Hidden File Input */}
       <input
         type="file"
         ref={fileInputRef}
@@ -792,7 +798,7 @@ export default function App() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
         
-        {/* 🔝 TOP NAVIGATION BAR (មាន Tab ដើម/Home ជាមួយ Logo Graduated) */}
+        {/* 🔝 TOP NAVIGATION BAR */}
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           
           <nav className="flex space-x-1.5 w-full sm:w-auto overflow-x-auto">
@@ -863,7 +869,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* ================= 🎓 1. HOME TAB (បង្ហាញដំបូង + DASHBOARD វត្តមានខាងក្រោម) ================= */}
+        {/* ================= 🎓 1. HOME TAB (បង្ហាញដំបូង + DASHBOARD វត្តមាន) ================= */}
         {activeTab === "home" && (
           <div className="space-y-6">
             
@@ -880,13 +886,17 @@ export default function App() {
                 </p>
               </div>
 
-              <button
-                onClick={() => setActiveTab("students")}
-                className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg transition-all shrink-0 flex items-center gap-2"
-              >
-                <UserCheck className="w-4 h-4" />
-                <span>គ្រប់គ្រងសិស្សក្នុងថ្នាក់</span>
-              </button>
+              <div className="flex gap-2">
+                {/* ⚡ ប៊ូតុងបង្កើត ២១២ នាក់ស្វ័យប្រវត្តិ */}
+                <button
+                  onClick={handleGenerate212Students}
+                  className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg transition-all shrink-0 flex items-center gap-1.5"
+                  title="បង្កើតបញ្ជីឈ្មោះគរុនិស្សិត ២១២ នាក់ស្វ័យប្រវត្តិ"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>⚡ បង្កើត ២១២ នាក់</span>
+                </button>
+              </div>
             </div>
 
             {/* វត្តមានសិស្សខាងក្រោម (Attendance Dashboard) */}
@@ -895,7 +905,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 👤 2. ACCOUNT TAB (អាចកែប្រែបាន + ប្ដូររូបមិនលើស 2MB) ================= */}
+        {/* ================= 👤 2. ACCOUNT TAB ================= */}
         {activeTab === "account" && (
           <div className="space-y-6">
             
@@ -922,7 +932,6 @@ export default function App() {
               <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs text-center space-y-5 flex flex-col justify-between">
                 <div className="space-y-4">
                   
-                  {/* Avatar Photo + Camera Trigger (2MB Limit) */}
                   <div className="relative w-36 h-36 mx-auto">
                     <img
                       src={userProfile.profilePhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"}
@@ -1030,7 +1039,7 @@ export default function App() {
                         <h4 className="font-extrabold text-slate-900 text-sm mt-0.5">{userProfile.schoolName}</h4>
                         <div className="flex gap-2 mt-1.5 text-[10px] text-slate-500 font-mono">
                           <span className="px-2 py-0.5 bg-white border rounded">កូដ: {userProfile.schoolCode}</span>
-                          <span className="px-2 py-0.5 bg-white border rounded">មេមត់, ខេត្តត្បូងឃ្មុំ</span>
+                          <span className="px-2 py-0.5 bg-white border rounded">ខេត្តកំពង់ចាម</span>
                         </div>
                       </div>
                     </div>
@@ -1051,38 +1060,6 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-                    <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
-                      <Shield className="w-4 h-4 text-blue-600" />
-                      <span>សុវត្ថិភាពគណនី</span>
-                    </span>
-                    <p className="text-[10px] text-slate-400 leading-snug">ផ្លាស់ប្តូរលេខសម្ងាត់ជាទៀងទាត់</p>
-                    <button className="w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-1">
-                      <Key className="w-3.5 h-3.5 text-slate-500" />
-                      <span>ប្ដូរលេខសម្ងាត់</span>
-                    </button>
-                  </div>
-
-                  <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-                    <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
-                      <Heart className="w-4 h-4 text-pink-600" />
-                      <span>សុខភាព និងតម្រូវការ</span>
-                    </span>
-                    <p className="text-[10px] text-slate-400 italic">មិនមានព័ត៌មានសុខភាព</p>
-                  </div>
-
-                  <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
-                    <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
-                      <RefreshCw className="w-4 h-4 text-emerald-600" />
-                      <span>ធ្វើបច្ចុប្បន្នភាព</span>
-                    </span>
-                    <button className="w-full py-2 bg-[#0f2b5c] hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs mt-2">
-                      ធ្វើបច្ចុប្បន្នភាពឥឡូវ
-                    </button>
-                  </div>
-                </div>
-
               </div>
 
             </div>
@@ -1090,8 +1067,41 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស (STUDENTS) ================= */}
-        {activeTab === "students" && <AttendanceDashboardComponent />}
+        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស ================= */}
+        {activeTab === "students" && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">បញ្ជីឈ្មោះគរុនិស្សិតសរុប ({students.length} នាក់)</h3>
+                <p className="text-xs text-slate-500 mt-0.5">គ្រប់គ្រង បន្ថែម ឬកែប្រែព័ត៌មានលម្អិតរបស់គរុនិស្សិត</p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleGenerate212Students}
+                  className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>⚡ បង្កើត ២១២ នាក់</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setEditingStudentId(null);
+                    setStudentForm(emptyStudentForm);
+                    setShowStudentModal(true);
+                  }}
+                  className="px-4 py-2.5 bg-[#0f2b5c] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4 text-emerald-400" />
+                  <span>+ បញ្ចូលសិស្សថ្មី</span>
+                </button>
+              </div>
+            </div>
+
+            <AttendanceDashboardComponent />
+          </div>
+        )}
 
         {/* ================= 📊 4. TAB: របាយការណ៍ (REPORTS) ================= */}
         {activeTab === "reports" && (
@@ -1137,10 +1147,10 @@ export default function App() {
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl max-h-[600px]">
               <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-slate-100 border-b text-slate-700 font-bold">
+                <thead className="sticky top-0 bg-slate-100 border-b text-slate-700 font-bold">
+                  <tr>
                     <th className="p-3">ល.រ</th>
                     <th className="p-3">ឈ្មោះសិស្ស</th>
                     <th className="p-3">ភេទ</th>
@@ -1241,7 +1251,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលាកំពុងបង្រើន</label>
+                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលារៀន</label>
                     <input
                       type="text"
                       required
@@ -1346,7 +1356,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="ឧ. សុខ ពិសី"
+                      placeholder="ឧ. ធឿន ផានិត"
                       value={studentForm.name}
                       onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
@@ -1399,7 +1409,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលាកំពុងបង្រើន</label>
+                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលារៀន</label>
                     <input
                       type="text"
                       placeholder="មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម"
