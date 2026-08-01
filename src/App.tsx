@@ -41,13 +41,15 @@ import {
   Shield,
   Heart,
   RefreshCw,
-  Lock,
   Download,
   Camera,
   Key,
   QrCode,
   GraduationCap,
-  Sparkles
+  FileSpreadsheet,
+  Upload,
+  CheckSquare,
+  Square
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile } from "./types";
 import QRCode from "qrcode";
@@ -68,6 +70,54 @@ const initialProfile: UserProfile = {
   gradeClass: "ថ្នាក់ទី ៣គ (គ)",
   profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
 };
+
+const defaultStudentsList: Student[] = [
+  {
+    id: "s-101",
+    name: "ធឿន ផានិត",
+    gender: "ប្រុស",
+    dob: "2004-10-14",
+    profilePhoto: "",
+    schoolName: "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ",
+    phoneNumber: "0961122334",
+    telegram: "phanitkrn",
+    address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
+    village: "ក្តុលផ្សារ",
+    commune: "ទន្លូង",
+    district: "មេមត់",
+    province: "ខេត្តត្បូងឃ្មុំ"
+  },
+  {
+    id: "s-102",
+    name: "ចិត្រា វ៉ារិន",
+    gender: "ប្រុស",
+    dob: "2003-05-18",
+    profilePhoto: "",
+    schoolName: "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ",
+    phoneNumber: "0968877661",
+    telegram: "varinchitra",
+    address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
+    village: "ក្តុលផ្សារ",
+    commune: "ទន្លូង",
+    district: "មេមត់",
+    province: "ខេត្តត្បូងឃ្មុំ"
+  },
+  {
+    id: "s-103",
+    name: "ធឿន ទី",
+    gender: "ប្រុស",
+    dob: "2004-08-05",
+    profilePhoto: "",
+    schoolName: "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ",
+    phoneNumber: "0889988772",
+    telegram: "tichn",
+    address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
+    village: "ក្តុលផ្សារ",
+    commune: "ទន្លូង",
+    district: "មេមត់",
+    province: "ខេត្តត្បូងឃ្មុំ"
+  }
+];
 
 const removeUndefinedFields = <T extends object>(data: T) => {
   return Object.fromEntries(
@@ -216,12 +266,18 @@ export default function App() {
 
   // Core States
   const [userProfile, setUserProfile] = useState<UserProfile>(initialProfile);
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<Student[]>(defaultStudentsList);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
   const [shift, setShift] = useState<AttendanceShift>("morning");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+
+  // 🔥 Multi-Select Students State សម្រាប់លុបច្រើនក្នុងពេលតែមួយ
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+
+  // CSV Bulk Import Modal State
+  const [showCSVModal, setShowCSVModal] = useState(false);
 
   // Edit Teacher Profile Modal State
   const [showProfileEditModal, setShowProfileEditModal] = useState(false);
@@ -300,47 +356,145 @@ export default function App() {
     };
   }, []);
 
-  // ⚡ បង្កើត ២១២ នាក់ស្វ័យប្រវត្តិ
-  const handleGenerate212Students = async () => {
-    if (!window.confirm("តើអ្នកពិតជាចង់បង្កើតបញ្ជីឈ្មោះគរុនិស្សិតចំនួន ២១២ នាក់ចូលក្នុងប្រព័ន្ធមែនទេ?")) return;
+  // 🔥 មុខងារទាញយកតារាងគំរូ CSV (Download CSV Import Template)
+  const handleDownloadCSVTemplate = () => {
+    const BOM = "\uFEFF";
+    const headers = ["ID", "ឈ្មោះ", "ភេទ", "ថ្ងៃកំណើត(YYYY-MM-DD)", "លេខទូរស័ព្ទ", "Telegram", "ឈ្មោះសាលារៀន", "ភូមិ", "ឃុំ", "ស្រុក", "ខេត្ត"];
+    const samples = [
+      ["st-001", "ធឿន ផានិត", "ប្រុស", "2004-10-14", "0961122334", "phanitkrn", "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ", "ក្តុលផ្សារ", "ទន្លូង", "មេមត់", "ខេត្តត្បូងឃ្មុំ"],
+      ["st-002", "ចិត្រា វ៉ារិន", "ប្រុស", "2003-05-18", "0968877661", "varinchitra", "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ", "ក្តុលផ្សារ", "ទន្លូង", "មេមត់", "ខេត្តត្បូងឃ្មុំ"],
+      ["st-003", "ធឿន ទី", "ប្រុស", "2004-08-05", "0889988772", "tichn", "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ", "ក្តុលផ្សារ", "ទន្លូង", "មេមត់", "ខេត្តត្បូងឃ្មុំ"]
+    ];
+
+    const csvContent = BOM + [headers.join(","), ...samples.map(s => s.map(v => `"${v}"`).join(","))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     
-    const khmerFirstNames = ["សុខ", "លី", "ធឿន", "ចិត្រា", "កែវ", "ហេង", "មុន្នី", "ចាន់", "រតនៈ", "វ៉ាន់", "សុភក្ត្រ", "គឹម", "អ៊ាន", "ផានិត", "ម៉េង", "សិលា"];
-    const khmerLastNames = ["ផានិត", "វ៉ារិន", "ទី", "រ៉ា", "ដារ៉ា", "វឌ្ឍនៈ", "ពិសិដ្ឋ", "សម្បត្តិ", "វិបុល", "ចិន្តា", "សុខា", "ស្រីណុច", "បូរ៉ា", "ម៉ានិត", "នាថ"];
-    
-    const generatedList: Student[] = [];
-    for (let i = 1; i <= 212; i++) {
-      const fName = khmerFirstNames[i % khmerFirstNames.length];
-      const lName = khmerLastNames[(i * 3) % khmerLastNames.length];
-      const gender = i % 3 === 0 ? "ស្រី" : "ប្រុស";
-      
-      generatedList.push({
-        id: `rttc-${String(i).padStart(3, "0")}`,
-        name: `${fName} ${lName}`,
-        gender: gender as "ប្រុស" | "ស្រី",
-        dob: "2004-05-10",
-        phoneNumber: `096${String(1000000 + i).slice(0, 7)}`,
-        telegram: `trainee_${i}`,
-        schoolName: userProfile.schoolName,
-        address: "ខេត្តកំពង់ចាម",
-        village: "ភូមិវាល",
-        commune: "ឃុំព្រៃឈរ",
-        district: "ស្រុកព្រៃឈរ",
-        province: "ខេត្តកំពង់ចាម"
-      });
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "student_import_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    triggerToast("បានទាញយកតារាងគំរូ CSV រួចរាល់!");
+  };
+
+  // 🔥 មុខងារ Upload / Import ឯកសារ CSV សិស្សច្រើននាក់
+  const handleCSVImportUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
+        
+        if (lines.length < 2) {
+          triggerToast("⚠️ ឯកសារ CSV គ្មានទិន្នន័យត្រឹមត្រូវទេ!");
+          return;
+        }
+
+        const parsedStudents: Student[] = [];
+        for (let i = 1; i < lines.length; i++) {
+          const row = lines[i].split(",").map(val => val.trim().replace(/^["']|["']$/g, ""));
+          if (row.length >= 2 && row[1]) {
+            const id = row[0] || `st-${Date.now()}-${i}`;
+            const name = row[1];
+            const gender = (row[2] === "ស្រី" || row[2]?.toLowerCase() === "female") ? "ស្រី" : "ប្រុស";
+            const dob = row[3] || "2004-01-01";
+            const phoneNumber = row[4] || "0960000000";
+            const telegram = row[5] || "";
+            const schoolName = row[6] || userProfile.schoolName;
+            const village = row[7] || "";
+            const commune = row[8] || "";
+            const district = row[9] || "";
+            const province = row[10] || "";
+            const address = [village, commune, district, province].filter(Boolean).join(", ") || "ខេត្តកំពង់ចាម";
+
+            parsedStudents.push({
+              id,
+              name,
+              gender,
+              dob,
+              phoneNumber,
+              telegram,
+              schoolName,
+              village,
+              commune,
+              district,
+              province,
+              address
+            });
+          }
+        }
+
+        if (parsedStudents.length === 0) {
+          triggerToast("⚠️ មិនមានទិន្នន័យសិស្សត្រឹមត្រូវទេ!");
+          return;
+        }
+
+        // រក្សាទុកចូល Firestore
+        const batch = writeBatch(db);
+        parsedStudents.forEach(st => {
+          batch.set(doc(db, "students", st.id), removeUndefinedFields(st));
+        });
+        await batch.commit();
+
+        setStudents(prev => {
+          const merged = [...prev];
+          parsedStudents.forEach(newSt => {
+            const idx = merged.findIndex(s => s.id === newSt.id);
+            if (idx >= 0) merged[idx] = newSt;
+            else merged.push(newSt);
+          });
+          return merged;
+        });
+
+        setShowCSVModal(false);
+        triggerToast(`បាននាំចូលសិស្សចំនួន ${parsedStudents.length} នាក់ជោគជ័យ!`);
+      } catch (err) {
+        console.error("Error reading CSV:", err);
+        triggerToast("មានបញ្ហាក្នុងការអានឯកសារ CSV");
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+    e.target.value = "";
+  };
+
+  // 🔥 មុខងារជ្រើសរើសសិស្សដើម្បីលុបច្រើននាក់ (Bulk Delete Function)
+  const toggleSelectStudent = (id: string) => {
+    setSelectedStudentIds(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllStudents = () => {
+    if (selectedStudentIds.length === filteredList.length) {
+      setSelectedStudentIds([]);
+    } else {
+      setSelectedStudentIds(filteredList.map(s => s.id));
     }
+  };
+
+  const handleBulkDeleteStudents = async () => {
+    if (selectedStudentIds.length === 0) return;
+    if (!window.confirm(`តើអ្នកពិតជាចង់លុបសិស្សចំនួន ${selectedStudentIds.length} នាក់ដែលបានជ្រើសរើសមែនទេ?`)) return;
 
     try {
       const batch = writeBatch(db);
-      generatedList.forEach(st => {
-        batch.set(doc(db, "students", st.id), removeUndefinedFields(st));
+      selectedStudentIds.forEach(id => {
+        batch.delete(doc(db, "students", id));
       });
       await batch.commit();
-      setStudents(generatedList);
-      triggerToast("បានបង្កើតគរុនិស្សិតចំនួន ២១២ នាក់ចូលក្នុង Firestore ជោគជ័យ!");
+
+      setStudents(prev => prev.filter(s => !selectedStudentIds.includes(s.id)));
+      setSelectedStudentIds([]);
+      triggerToast(`បានលុបសិស្សចំនួន ${selectedStudentIds.length} នាក់ជោគជ័យ!`);
     } catch (err) {
-      console.error(err);
-      setStudents(generatedList);
-      triggerToast("បានបង្កើតគរុនិស្សិតចំនួន ២១២ នាក់ក្នុងប្រព័ន្ធ!");
+      console.error("Error bulk deleting:", err);
+      triggerToast("មានបញ្ហាក្នុងការលុបសិស្ស");
     }
   };
 
@@ -536,7 +690,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
       
-      {/* Hidden File Input */}
+      {/* Hidden File Input Profile */}
       <input
         type="file"
         ref={fileInputRef}
@@ -566,8 +720,6 @@ export default function App() {
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           
           <nav className="flex space-x-1.5 w-full sm:w-auto overflow-x-auto">
-            
-            {/* 🎓 1. HOME TAB */}
             <button
               onClick={() => setActiveTab("home")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -578,7 +730,6 @@ export default function App() {
               <span>ទំព័រដើម</span>
             </button>
 
-            {/* 👤 2. ACCOUNT TAB */}
             <button
               onClick={() => setActiveTab("account")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -589,7 +740,6 @@ export default function App() {
               <span>គណនីខ្ញុំ</span>
             </button>
 
-            {/* 👨‍🎓 3. STUDENTS TAB */}
             <button
               onClick={() => setActiveTab("students")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -600,7 +750,6 @@ export default function App() {
               <span>គ្រប់គ្រងសិស្ស</span>
             </button>
 
-            {/* 📊 4. REPORTS TAB */}
             <button
               onClick={() => setActiveTab("reports")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -637,7 +786,6 @@ export default function App() {
         {activeTab === "home" && (
           <div className="space-y-6">
             
-            {/* Welcome Banner */}
             <div className="bg-gradient-to-r from-[#0f2b5c] via-blue-900 to-slate-900 text-white p-6 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="space-y-2 text-center md:text-left">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-amber-300 backdrop-blur-xs">
@@ -650,16 +798,13 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={handleGenerate212Students}
-                  className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg transition-all shrink-0 flex items-center gap-1.5"
-                  title="បង្កើតបញ្ជីឈ្មោះគរុនិស្សិត ២១២ នាក់ស្វ័យប្រវត្តិ"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>⚡ បង្កើត ២១២ នាក់</span>
-                </button>
-              </div>
+              <button
+                onClick={() => setActiveTab("students")}
+                className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-2xl shadow-lg transition-all shrink-0 flex items-center gap-2"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>គ្រប់គ្រងសិស្សក្នុងថ្នាក់</span>
+              </button>
             </div>
 
             {/* Dashboard វត្តមានសិស្ស */}
@@ -731,7 +876,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* ស្វែងរកសិស្ស (គ្មានកំហុសរលត់ Cursor ទៀតទេ) */}
+              {/* ស្វែងរកសិស្ស */}
               <div className="relative max-w-sm">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
                 <input
@@ -1086,24 +1231,37 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស ================= */}
+        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស (មាន Multi-Select & Bulk CSV Import) ================= */}
         {activeTab === "students" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">បញ្ជីឈ្មោះគរុនិស្សិតសរុប ({students.length} នាក់)</h3>
-                <p className="text-xs text-slate-500 mt-0.5">គ្រប់គ្រង បន្ថែម ឬកែប្រែព័ត៌មានលម្អិតរបស់គរុនិស្សិត</p>
+                <p className="text-xs text-slate-500 mt-0.5">គ្រប់គ្រង បន្ថែម នាំចូល CSV ឬលុបសិស្សច្រើននាក់</p>
               </div>
 
               <div className="flex flex-wrap gap-2">
+                {/* 📥 ប៊ូតុង នាំចូល CSV (Bulk Import) */}
                 <button
-                  onClick={handleGenerate212Students}
-                  className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+                  onClick={() => setShowCSVModal(true)}
+                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>⚡ បង្កើត ២១២ នាក់</span>
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>នាំចូល CSV</span>
                 </button>
 
+                {/* 🗑️ ប៊ូតុង លុបសិស្សច្រើននាក់ (Bulk Delete) */}
+                {selectedStudentIds.length > 0 && (
+                  <button
+                    onClick={handleBulkDeleteStudents}
+                    className="px-3.5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 animate-pulse"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>លុបសិស្ស ({selectedStudentIds.length} នាក់)</span>
+                  </button>
+                )}
+
+                {/* ➕ ប៊ូតុង បន្ថែមសិស្សថ្មី */}
                 <button
                   onClick={() => {
                     setEditingStudentId(null);
@@ -1118,100 +1276,56 @@ export default function App() {
               </div>
             </div>
 
-            {/* បង្ហាញវត្តមានសិស្ស */}
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-[#0f2b5c]">
-                  <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
-                  <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
-                </div>
-                <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
-                  {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
-                </span>
-              </div>
+            {/* Select All Bar */}
+            <div className="flex justify-between items-center bg-slate-100 p-3 rounded-xl text-xs font-bold text-slate-700">
+              <button
+                onClick={toggleSelectAllStudents}
+                className="flex items-center gap-2 text-slate-800 hover:text-blue-900 cursor-pointer"
+              >
+                {selectedStudentIds.length === filteredList.length && filteredList.length > 0 ? (
+                  <CheckSquare className="w-4 h-4 text-blue-700" />
+                ) : (
+                  <Square className="w-4 h-4 text-slate-400" />
+                )}
+                <span>ជ្រើសរើសទាំងអស់ ({filteredList.length} នាក់)</span>
+              </button>
 
-              {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន */}
-              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                    កាលបរិច្ឆេទ
-                  </label>
-                  <PremiumDatePicker
-                    id="rttc-date-input"
-                    value={selectedDate}
-                    onChange={setSelectedDate}
-                    lang={lang}
-                  />
-                </div>
+              {selectedStudentIds.length > 0 && (
+                <span className="text-blue-900 font-extrabold">បានជ្រើសរើស៖ {selectedStudentIds.length} នាក់</span>
+              )}
+            </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                    វេន <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={shift}
-                    onChange={(e) => setShift(e.target.value as AttendanceShift)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-600 transition-all cursor-pointer"
-                  >
-                    <option value="morning">វេនព្រឹក (07:30–11:00)</option>
-                    <option value="afternoon">វេនរសៀល (13:00–17:00)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* របារបង្ហាញស្ថិតិ ៥ ប្រអប់ */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                  <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
-                  <span className="text-xs font-bold text-slate-500">សរុប</span>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                  <span className="text-2xl font-black text-emerald-600 block mb-1">{presentCount}</span>
-                  <span className="text-xs font-bold text-slate-500">វត្តមាន</span>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                  <span className="text-2xl font-black text-red-600 block mb-1">{absentCount}</span>
-                  <span className="text-xs font-bold text-slate-500">អវត្តមាន</span>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                  <span className="text-2xl font-black text-amber-600 block mb-1">{lateCount}</span>
-                  <span className="text-xs font-bold text-slate-500">យឺត</span>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs col-span-2 sm:col-span-1">
-                  <span className="text-2xl font-black text-blue-600 block mb-1">{permissionCount}</span>
-                  <span className="text-xs font-bold text-slate-500">ច្បាប់</span>
-                </div>
-              </div>
-
-              {/* ស្វែងរកសិស្ស */}
-              <div className="relative max-w-sm">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-                <input
-                  type="text"
-                  placeholder="ស្វែងរកឈ្មោះ, លេខទូរស័ព្ទ..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:outline-none focus:border-blue-600 font-semibold"
-                />
-              </div>
-
-              {/* កាតសិស្ស */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
-                {filteredList.map((st, i) => (
+            {/* បញ្ជីសិស្សជាមួយ Checkbox */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
+              {filteredList.map((st, i) => {
+                const isSelected = selectedStudentIds.includes(st.id);
+                return (
                   <div
                     key={st.id}
-                    className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all flex flex-col justify-between"
+                    className={`bg-white rounded-2xl border p-4 shadow-2xs space-y-3 transition-all flex flex-col justify-between ${
+                      isSelected ? "border-blue-600 bg-blue-50/20 ring-2 ring-blue-500/20" : "border-slate-200/90 hover:shadow-md"
+                    }`}
                   >
                     <div>
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
+                          {/* Multi Select Checkbox */}
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectStudent(st.id)}
+                            className="text-slate-400 hover:text-blue-600 cursor-pointer shrink-0"
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-5 h-5 text-blue-700" />
+                            ) : (
+                              <Square className="w-5 h-5 text-slate-300" />
+                            )}
+                          </button>
+
+                          <div className="w-8 h-8 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-xs shrink-0">
                             {i + 1}
                           </div>
+
                           <div className="min-w-0 flex-1">
                             <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
                               {st.name}
@@ -1294,55 +1408,10 @@ export default function App() {
                         </button>
                       </div>
 
-                      {/* ប្រអប់សរសេរមូលហេតុ */}
-                      <AnimatePresence>
-                        {st.status !== "Present" && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="pt-2 border-t border-slate-100 space-y-1 overflow-hidden mt-2"
-                          >
-                            <label className="block text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
-                              <FileText className="w-3.5 h-3.5 text-blue-600" />
-                              <span>
-                                មូលហេតុ ({st.status === "Absent" || st.status === "Absent_No_Permission" ? "អវត្តមាន" : st.status === "Late" ? "មកយឺត" : "សុំច្បាប់"}) ៖
-                              </span>
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="បញ្ចូលមូលហេតុ (ឧ. ឈឺ, ស្ទះផ្លូវ, មានធុរៈ...)"
-                              value={st.absenceNote || ""}
-                              onChange={(e) => {
-                                const newNote = e.target.value;
-                                setAttendance(prev => {
-                                  const recordId = `${st.id}-${selectedDate}-${shift}`;
-                                  const exists = prev.some(r => r.id === recordId);
-                                  if (exists) {
-                                    return prev.map(r => r.id === recordId ? { ...r, absenceNote: newNote } : r);
-                                  } else {
-                                    return [...prev, {
-                                      id: recordId,
-                                      studentId: st.id,
-                                      date: selectedDate,
-                                      shift,
-                                      status: st.status,
-                                      absenceNote: newNote
-                                    }];
-                                  }
-                                });
-                              }}
-                              onBlur={(e) => updateAbsenceNote(st.id, e.target.value)}
-                              className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 font-semibold text-slate-800 transition-all"
-                            />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1433,6 +1502,80 @@ export default function App() {
         )}
 
       </div>
+
+      {/* MODAL នាំចូល CSV/EXCEL (BULK CSV IMPORT MODAL) */}
+      <AnimatePresence>
+        {showCSVModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl relative space-y-4"
+            >
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                  <span>នាំចូលសិស្សច្រើននាក់ (CSV Import)</span>
+                </h3>
+                <button onClick={() => setShowCSVModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                {/* Step 1: Download Template */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                  <span className="font-extrabold text-slate-800 block">១. ទាញយកតារាងគំរូ CSV ៖</span>
+                  <p className="text-slate-500 text-[11px]">ទាញយកតារាងគំរូ រួចបំពេញឈ្មោះសិស្ស ភេទ និងលេខទូរស័ព្ទក្នុង Excel</p>
+                  <button
+                    onClick={handleDownloadCSVTemplate}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl flex items-center gap-1.5 transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>ទាញយកតារាងគំរូ CSV</span>
+                  </button>
+                </div>
+
+                {/* Step 2: Upload Completed File */}
+                <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-2 text-center">
+                  <span className="font-extrabold text-emerald-900 block text-left">២. ជ្រើសរើសឯកសារ CSV ដែលបានបំពេញរួច ៖</span>
+                  
+                  <input
+                    type="file"
+                    ref={csvFileInputRef}
+                    accept=".csv"
+                    onChange={handleCSVImportUpload}
+                    className="hidden"
+                  />
+
+                  <button
+                    onClick={() => csvFileInputRef.current?.click()}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>ជ្រើសរើសឯកសារ CSV ដើម្បី Upload</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end border-t pt-3">
+                <button
+                  onClick={() => setShowCSVModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                >
+                  បិទ
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* MODAL កែប្រែព័ត៌មានគណនីគ្រូ (EDIT TEACHER PROFILE MODAL) */}
       <AnimatePresence>
