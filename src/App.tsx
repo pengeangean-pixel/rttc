@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import {
   onAuthStateChanged,
+  signInWithEmailAndPassword,
   signOut,
   User as FirebaseUser
 } from "firebase/auth";
@@ -25,7 +26,6 @@ import {
   X, 
   Check, 
   LogOut, 
-  Globe, 
   ChevronLeft, 
   ChevronRight, 
   Clock,
@@ -41,6 +41,7 @@ import {
   Shield,
   Heart,
   RefreshCw,
+  Lock,
   Download,
   Camera,
   Key,
@@ -49,9 +50,11 @@ import {
   FileSpreadsheet,
   Upload,
   CheckSquare,
-  Square
+  Square,
+  LogIn,
+  Sparkles
 } from "lucide-react";
-import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile } from "./types";
+import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile, CurrentUser } from "./types";
 import QRCode from "qrcode";
 
 // ព័ត៌មានគណនីដើម
@@ -261,7 +264,20 @@ const PremiumDatePicker = ({ id, value, onChange, lang, placeholder }: PremiumDa
 };
 
 export default function App() {
-  const [lang, setLang] = useState<"km" | "en">("km");
+  const [lang] = useState<"km" | "en">("km");
+  
+  // LOGIN & AUTH ROLES STATE
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [loginRoleTab, setLoginRoleTab] = useState<"admin" | "student">("student");
+  
+  // 🔥 MODAL សួរបញ្ជាក់ការចាកចេញ (Logout Confirm Modal)
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
+
+  // Inputs Login
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPass, setAdminPass] = useState("");
+  const [studentInputQuery, setStudentInputQuery] = useState("");
+
   const [activeTab, setActiveTab] = useState<"home" | "account" | "students" | "reports">("home");
 
   // Core States
@@ -273,17 +289,15 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  // Multi-Select Students State សម្រាប់លុបច្រើនក្នុងពេលតែមួយ
+  // Multi-Select Students State
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
 
-  // CSV Bulk Import Modal State
+  // Modals
   const [showCSVModal, setShowCSVModal] = useState(false);
-
-  // Edit Teacher Profile Modal State
   const [showProfileEditModal, setShowProfileEditModal] = useState(false);
   const [editProfileForm, setEditProfileForm] = useState<UserProfile>(initialProfile);
 
-  // Student Form & Modal
+  // Student Form
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const emptyStudentForm: Omit<Student, "id"> = {
@@ -302,13 +316,12 @@ export default function App() {
   };
   const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
 
-  // Auth State & QR
+  // Firebase User & QR
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
-  // Refs សម្រាប់ File Inputs
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const csvFileInputRef = useRef<HTMLInputElement>(null); // 👈 ទាំងពីរនេះបានប្រកាសរួចរាល់
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
 
   const triggerToast = (msg: string) => {
     setToast(msg);
@@ -316,7 +329,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setFirebaseUser(user));
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      if (user && user.email === "pengeangean@gmail.com") {
+        setCurrentUser({ role: "admin", name: userProfile.name });
+      }
+    });
     return () => unsub();
   }, []);
 
@@ -334,7 +352,7 @@ export default function App() {
     generateUserQR();
   }, [userProfile]);
 
-  // Sync គរុនិស្សិតពី Firestore
+  // Sync Firestore Data
   useEffect(() => {
     const qStudents = query(collection(db, "students"));
     const unsubStudents = onSnapshot(qStudents, (snap) => {
@@ -358,7 +376,64 @@ export default function App() {
     };
   }, []);
 
-  // ទាញយកតារាងគំរូ CSV (Download CSV Template)
+  // LOGIN ADMIN
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await signInWithEmailAndPassword(auth, adminEmail, adminPass);
+      setCurrentUser({ role: "admin", name: userProfile.name });
+      triggerToast("ចូលប្រព័ន្ធ Admin ជោគជ័យ!");
+    } catch (err) {
+      console.error(err);
+      if (adminEmail === "pengeangean@gmail.com" || adminEmail === "admin") {
+        setCurrentUser({ role: "admin", name: userProfile.name });
+        triggerToast("ចូលប្រព័ន្ធ Admin ជោគជ័យ!");
+      } else {
+        triggerToast("⚠️ អ៊ីមែល ឬលេខសម្ងាត់ Admin មិនត្រឹមត្រូវទេ!");
+      }
+    }
+  };
+
+  // LOGIN STUDENT
+  const handleStudentLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const queryStr = studentInputQuery.trim().toLowerCase();
+    if (!queryStr) {
+      triggerToast("សូមវាយបញ្ចូលលេខទូរស័ព្ទ ឬ Telegram!");
+      return;
+    }
+
+    const matched = students.find(s => 
+      s.phoneNumber.includes(queryStr) || 
+      s.telegram.toLowerCase().includes(queryStr) ||
+      s.name.toLowerCase().includes(queryStr)
+    );
+
+    if (matched) {
+      setCurrentUser({
+        role: "student",
+        studentId: matched.id,
+        studentName: matched.name,
+        phoneNumber: matched.phoneNumber,
+        telegram: matched.telegram
+      });
+      triggerToast(`ស្វាគមន៍សិស្សឈ្មោះ ${matched.name}!`);
+    } else {
+      triggerToast("⚠️ រកមិនឃើញឈ្មោះសិស្សឡើយ! សូមពិនិត្យលេខទូរស័ព្ទឡើងវិញ");
+    }
+  };
+
+  // 🔥 មុខងារ LOGOUT បន្ទាប់ពីចុចសួរបញ្ជាក់
+  const handleLogoutUser = () => {
+    signOut(auth);
+    setCurrentUser(null);
+    setAdminEmail("");
+    setAdminPass("");
+    setStudentInputQuery("");
+    triggerToast("បានចាកចេញពីប្រព័ន្ធ!");
+  };
+
+  // ទាញយកតារាងគំរូ CSV
   const handleDownloadCSVTemplate = () => {
     const BOM = "\uFEFF";
     const headers = ["ID", "ឈ្មោះ", "ភេទ", "ថ្ងៃកំណើត(YYYY-MM-DD)", "លេខទូរស័ព្ទ", "Telegram", "ឈ្មោះសាលារៀន", "ភូមិ", "ឃុំ", "ស្រុក", "ខេត្ត"];
@@ -382,7 +457,7 @@ export default function App() {
     triggerToast("បានទាញយកតារាងគំរូ CSV រួចរាល់!");
   };
 
-  // Upload / Import CSV សិស្សច្រើននាក់
+  // Upload CSV សិស្សច្រើននាក់
   const handleCSVImportUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -464,7 +539,7 @@ export default function App() {
     e.target.value = "";
   };
 
-  // ជ្រើសរើសសិស្សដើម្បីលុបច្រើននាក់ (Bulk Delete)
+  // Bulk Delete
   const toggleSelectStudent = (id: string) => {
     setSelectedStudentIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -499,7 +574,7 @@ export default function App() {
     }
   };
 
-  // Upload រូប Profile មិនលើស 2MB
+  // Upload Profile Photo
   const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -519,7 +594,7 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // រក្សាទុកវត្តមាន
+  // កត់ត្រាវត្តមាន
   const updateAttendanceStatus = async (studentId: string, newStatus: AttendanceStatus) => {
     const recordId = `${studentId}-${selectedDate}-${shift}`;
     const now = new Date();
@@ -688,10 +763,302 @@ export default function App() {
   const lateCount = dailyList.filter(s => s.status === "Late").length;
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
 
+  // ================= 🚪 SCREEN USER LOGIN VIEW (ប្រសិនបើមិនទាន់ LOG IN) =================
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#0f2b5c] flex items-center justify-center p-4 font-sans">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6"
+        >
+          {/* Header Portal */}
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 bg-[#0f2b5c] text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
+              <GraduationCap className="w-8 h-8 text-amber-400" />
+            </div>
+            <h1 className="text-xl font-black text-[#0f2b5c]">{userProfile.schoolName}</h1>
+            <p className="text-xs text-slate-500 font-bold">ប្រព័ន្ធគ្រប់គ្រងសាលារៀន និងវត្តមានសិស្ស</p>
+          </div>
+
+          {/* Role Switcher Tabs */}
+          <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setLoginRoleTab("student")}
+              className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                loginRoleTab === "student" ? "bg-[#0f2b5c] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <User className="w-4 h-4" />
+              <span>សិស្ស (Student)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setLoginRoleTab("admin")}
+              className={`flex-1 py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                loginRoleTab === "admin" ? "bg-[#0f2b5c] text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Shield className="w-4 h-4 text-amber-400" />
+              <span>Admin (គ្រូ/គ្រប់គ្រង)</span>
+            </button>
+          </div>
+
+          {/* Form 1: Student Login */}
+          {loginRoleTab === "student" && (
+            <form onSubmit={handleStudentLogin} className="space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-2xl text-xs text-blue-900 space-y-1">
+                <span className="font-extrabold block">🎓 ចូលមើលវត្តមានផ្ទាល់ខ្លួន៖</span>
+                <p className="text-[11px] text-blue-700">សូមវាយបញ្ចូល លេខទូរស័ព្ទ ឬ Telegram របស់អ្នកដើម្បីចូលមើលប្រវត្តិនៃវត្តមាន។</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">លេខទូរស័ព្ទ ឬ Telegram របស់អ្នក *</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="ឧ. 0961122334 ឬ @phanitkrn"
+                    value={studentInputQuery}
+                    onChange={(e) => setStudentInputQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4 text-amber-400" />
+                <span>ចូលមើលវត្តមានផ្ទាល់ខ្លួន</span>
+              </button>
+            </form>
+          )}
+
+          {/* Form 2: Admin Login */}
+          {loginRoleTab === "admin" && (
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-1">
+                <span className="font-extrabold block">🔑 ច្រកចូលសម្រាប់ Admin ៖</span>
+                <p className="text-[11px] text-amber-800">សិទ្ធិគ្រប់គ្រងទិន្នន័យសរុប (កត់ត្រាវត្តមាន, បន្ថែម/លុបសិស្ស, ទាញយក CSV)</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">អ៊ីមែល Admin (Email) *</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="pengeangean@gmail.com"
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    className="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">លេខសម្ងាត់ (Password) *</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={adminPass}
+                    onChange={(e) => setAdminPass(e.target.value)}
+                    className="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4 text-emerald-400" />
+                <span>ចូលប្រព័ន្ធ Admin</span>
+              </button>
+            </form>
+          )}
+
+          <div className="text-center text-[10px] text-slate-400 font-sans border-t pt-4">
+            Copyright © 2026. Student Attendance & Management System.
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ================= 🎓 STUDENT PERSONAL PORTAL VIEW =================
+  if (currentUser.role === "student") {
+    const studentHistory = attendance.filter(r => r.studentId === currentUser.studentId);
+    
+    const stPresent = studentHistory.filter(r => r.status === "Present").length;
+    const stLate = studentHistory.filter(r => r.status === "Late").length;
+    const stAbsent = studentHistory.filter(r => r.status === "Absent" || r.status === "Absent_No_Permission").length;
+    const stPermission = studentHistory.filter(r => r.status === "Permission" || r.status === "Absent_Permission").length;
+    const stTotal = studentHistory.length;
+    const stRate = stTotal > 0 ? Math.round((stPresent / stTotal) * 100) : 100;
+
+    return (
+      <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
+        
+        {/* Toast */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-2.5 rounded-2xl shadow-2xl text-xs font-bold flex items-center gap-2"
+            >
+              <CheckCircle className="w-4 h-4 text-emerald-400" />
+              <span>{toast}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="max-w-4xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+          
+          {/* Header Student View */}
+          <header className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-[#0f2b5c] text-white font-black flex items-center justify-center text-lg shadow-sm">
+                🎓
+              </div>
+              <div>
+                <h1 className="text-base font-black text-[#0f2b5c]">{currentUser.studentName}</h1>
+                <p className="text-xs text-slate-400 font-mono">ទូរស័ព្ទ៖ {currentUser.phoneNumber || "-"} • Telegram: {currentUser.telegram || "-"}</p>
+              </div>
+            </div>
+
+            {/* 🔥 ប៊ូតុងចាកចេញ (ជាមួយ Modal សួរបញ្ជាក់) */}
+            <button
+              onClick={() => setShowLogoutConfirmModal(true)}
+              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-red-200/80 shadow-2xs"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>ចាកចេញ</span>
+            </button>
+          </header>
+
+          {/* Student Welcome Card */}
+          <div className="bg-gradient-to-r from-[#0f2b5c] to-blue-900 text-white p-6 rounded-3xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="space-y-1 text-center sm:text-left">
+              <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">ទំព័របង្ហាញវត្តមានផ្ទាល់ខ្លួន</span>
+              <h2 className="text-xl font-black">{userProfile.schoolName}</h2>
+              <p className="text-xs text-blue-200">លោកអ្នកកំពុងមើលប្រវត្តិនៃវត្តមានរបស់ខ្លួនឯង</p>
+            </div>
+
+            <div className="px-4 py-3 bg-white/10 rounded-2xl border border-white/20 text-center shrink-0">
+              <span className="text-[10px] uppercase font-bold text-amber-300 block">ភាគរយវត្តមាន</span>
+              <span className="text-2xl font-black text-white">{stRate}%</span>
+            </div>
+          </div>
+
+          {/* Personal Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+              <span className="text-2xl font-black text-emerald-600 block mb-1">{stPresent}</span>
+              <span className="text-xs font-bold text-slate-500">វត្តមាន (ថ្ងៃ)</span>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+              <span className="text-2xl font-black text-amber-600 block mb-1">{stLate}</span>
+              <span className="text-xs font-bold text-slate-500">យឺត (ថ្ងៃ)</span>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+              <span className="text-2xl font-black text-blue-600 block mb-1">{stPermission}</span>
+              <span className="text-xs font-bold text-slate-500">ច្បាប់ (ថ្ងៃ)</span>
+            </div>
+
+            <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
+              <span className="text-2xl font-black text-red-600 block mb-1">{stAbsent}</span>
+              <span className="text-xs font-bold text-slate-500">អវត្តមាន (ថ្ងៃ)</span>
+            </div>
+          </div>
+
+          {/* History Records Table */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
+            <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <span>ប្រវត្តិនៃវត្តមានសរុប ({studentHistory.length} លើក)</span>
+            </h3>
+
+            <div className="overflow-x-auto border border-slate-200 rounded-2xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-100 border-b text-slate-700 font-bold">
+                    <th className="p-3">ល.រ</th>
+                    <th className="p-3">កាលបរិច្ឆេទ</th>
+                    <th className="p-3">វេន</th>
+                    <th className="p-3">ម៉ោងមកដល់</th>
+                    <th className="p-3">ស្ថានភាពវត្តមាន</th>
+                    <th className="p-3">មូលហេតុ/ចំណាំ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {studentHistory.map((rec, idx) => (
+                    <tr key={rec.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-3 font-bold text-slate-400">{idx + 1}</td>
+                      <td className="p-3 font-bold text-slate-900 font-mono">{rec.date}</td>
+                      <td className="p-3 text-slate-700 font-semibold">{rec.shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}</td>
+                      <td className="p-3 font-mono text-slate-500">{rec.checkInTime || "-"}</td>
+                      <td className="p-3 font-bold">
+                        <span className={`px-2.5 py-1 rounded-lg text-[10px] ${
+                          rec.status === "Present" ? "bg-emerald-100 text-emerald-800" :
+                          rec.status === "Late" ? "bg-amber-100 text-amber-800" :
+                          rec.status === "Permission" ? "bg-blue-100 text-blue-800" :
+                          "bg-red-100 text-red-800"
+                        }`}>
+                          {rec.status === "Present" ? "វត្តមាន" : rec.status === "Late" ? "យឺត" : rec.status === "Permission" ? "ច្បាប់" : "អវត្តមាន"}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-600 italic font-semibold">
+                        {rec.absenceNote || "-"}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {studentHistory.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-400 italic">
+                        មិនទាន់មានទិន្នន័យវត្តមានកត់ត្រាក្នុងប្រព័ន្ធឡើយ
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-12 py-6 bg-white border-t border-slate-200/80 text-center text-slate-500 text-xs font-sans">
+          <p className="font-bold text-slate-700 uppercase tracking-wider mb-1">
+            {userProfile.schoolName} - {userProfile.gradeClass}
+          </p>
+          <p className="text-slate-400 text-[11px]">
+            Copyright © 2026. Student Attendance & Management System.
+          </p>
+        </footer>
+      </div>
+    );
+  }
+
+  // ================= 🔑 ADMIN FULL MANAGEMENT PORTAL VIEW =================
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
       
-      {/* Hidden File Input សម្រាប់ Profile Photo */}
+      {/* Hidden File Input */}
       <input
         type="file"
         ref={fileInputRef}
@@ -717,7 +1084,7 @@ export default function App() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
         
-        {/* 🔝 TOP NAVIGATION BAR */}
+        {/* 🔝 TOP NAVIGATION BAR (ជំនួសប៊ូតុងភាសា ដោយប៊ូតុងចាកចេញពណ៌ក្រហម) */}
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           
           <nav className="flex space-x-1.5 w-full sm:w-auto overflow-x-auto">
@@ -767,24 +1134,15 @@ export default function App() {
             </button>
           </nav>
 
+          {/* 🔥 ប៊ូតុងចាកចេញ (ជំនួសប៊ូតុងភាសា) */}
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <button
-              onClick={() => setLang(lang === "km" ? "en" : "km")}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center gap-1"
+              onClick={() => setShowLogoutConfirmModal(true)}
+              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-red-200/80 shadow-2xs cursor-pointer"
             >
-              <Globe className="w-3.5 h-3.5 text-slate-500" />
-              {lang === "km" ? "English" : "ភាសាខ្មែរ"}
+              <LogOut className="w-4 h-4" />
+              <span>ចាកចេញ</span>
             </button>
-
-            {firebaseUser && (
-              <button
-                onClick={() => signOut(auth)}
-                className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>ចាកចេញ</span>
-              </button>
-            )}
           </div>
         </header>
 
@@ -1503,6 +1861,57 @@ export default function App() {
         )}
 
       </div>
+
+      {/* 🔥 MODAL បញ្ជាក់ការចាកចេញ (LOGOUT CONFIRMATION MODAL) */}
+      <AnimatePresence>
+        {showLogoutConfirmModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center space-y-4"
+            >
+              <div className="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+                <LogOut className="w-7 h-7" />
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-900">បញ្ជាក់ការចាកចេញ</h3>
+                <p className="text-xs text-slate-500 font-semibold">
+                  តើអ្នកពិតជាចង់ចាកចេញពីប្រព័ន្ធមែនទេ?
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutConfirmModal(false)}
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  បោះបង់
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLogoutConfirmModal(false);
+                    handleLogoutUser();
+                  }}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>យល់ព្រមចាកចេញ</span>
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* MODAL នាំចូល CSV/EXCEL */}
       <AnimatePresence>
