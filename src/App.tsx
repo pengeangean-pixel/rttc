@@ -36,6 +36,7 @@ import {
   MapPin,
   FileText,
   User,
+  UserCheck,
   Shield,
   Heart,
   RefreshCw,
@@ -137,7 +138,7 @@ const parseISODate = (dateString: string) => {
 const KHMER_MONTHS = ["មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា", "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ"];
 const EN_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const WEEKDAY_LABELS = {
-  km: ["ច", "អ", "พ", "ព្រ", "សុ", "ស", "អា"],
+  km: ["ច", "អ", "ព", "ព្រ", "សុ", "ស", "អា"],
   en: ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 };
 
@@ -260,7 +261,7 @@ const PremiumDatePicker = ({ id, value, onChange, lang, placeholder }: PremiumDa
 export default function App() {
   const [lang, setLang] = useState<"km" | "en">("km");
   
-  // 🔥 បើកមកបង្ហាញ Tab "home" ដំបូងគេ
+  // បើកមកបង្ហាញ Tab "home" ដំបូងគេ
   const [activeTab, setActiveTab] = useState<"home" | "account" | "students" | "reports">("home");
 
   // Core States
@@ -346,12 +347,11 @@ export default function App() {
     };
   }, []);
 
-  // 🔥 មុខងារប្ដូររូបភាព Profile (ត្រួតពិនិត្យមិនឱ្យលើសពី 2MB)
+  // មុខងារប្ដូររូបភាព Profile (ត្រួតពិនិត្យមិនឱ្យលើសពី 2MB)
   const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // ត្រួតពិនិត្យទំហំ 2MB (2 * 1024 * 1024 Bytes)
     if (file.size > 2 * 1024 * 1024) {
       triggerToast("⚠️ រូបភាពមិនអាចលើសពី 2MB បានទេ!");
       e.target.value = "";
