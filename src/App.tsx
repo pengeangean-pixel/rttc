@@ -1,36 +1,3 @@
-import { 
-  CheckCircle, 
-  Search, 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Calendar, 
-  X, 
-  Check, 
-  LogOut, 
-  Globe, 
-  ChevronLeft, 
-  ChevronRight, 
-  Clock,
-  UserPlus,
-  Save,
-  Building,
-  Phone,
-  Send,
-  MapPin,
-  FileText,
-  User,
-  UserCheck, // 👈 បន្ថែម UserCheck ត្រង់នេះ!
-  Shield,
-  Heart,
-  RefreshCw,
-  Lock,
-  Download,
-  Camera,
-  Flag,
-  Key,
-  QrCode
-} from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import { auth, db } from "./firebase";
 import { 
@@ -69,6 +36,7 @@ import {
   MapPin,
   FileText,
   User,
+  UserCheck,
   Shield,
   Heart,
   RefreshCw,
@@ -303,9 +271,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  // Profile Edit Modal State
-  const [showEditProfileModal, setShowStudentEditProfileModal] = useState(false);
-
   // Student Form & Modal
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
@@ -492,9 +457,9 @@ export default function App() {
     setShowStudentModal(true);
   };
 
-  // 🔥 មុខងារទាញយករបាយការណ៍ Excel / CSV Report Download
+  // ទាញយករាយការណ៍ Excel / CSV
   const handleDownloadReport = () => {
-    const BOM = "\uFEFF"; // For Khmer UTF-8
+    const BOM = "\uFEFF";
     const headers = ["ល.រ", "ឈ្មោះសិស្ស", "ភេទ", "ថ្ងៃខែឆ្នាំកំណើត", "លេខទូរស័ព្ទ", "Telegram", "ស្ថានភាពវត្តមាន", "មូលហេតុ", "កាលបរិច្ឆេទ", "វេន"];
     
     const rows = dailyList.map((st, idx) => [
@@ -553,10 +518,9 @@ export default function App() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
         
-        {/* 🔝 TOP NAVIGATION BAR (៣ Tabs សំខាន់ៗ) */}
+        {/* 🔝 TOP NAVIGATION BAR */}
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
           
-          {/* Tabs Switcher */}
           <nav className="flex space-x-1.5 w-full sm:w-auto">
             <button
               onClick={() => setActiveTab("account")}
@@ -589,7 +553,6 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Right Action */}
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <button
               onClick={() => setLang(lang === "km" ? "en" : "km")}
@@ -611,11 +574,10 @@ export default function App() {
           </div>
         </header>
 
-        {/* ================= 1. TAB: គណនីខ្ញុំ (MY ACCOUNT - SCREENSHOT DESIGN MATCH) ================= */}
+        {/* ================= 1. TAB: គណនីខ្ញុំ (MY ACCOUNT) ================= */}
         {activeTab === "account" && (
           <div className="space-y-6">
             
-            {/* Title & Edit Button Header */}
             <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
               <h2 className="text-lg font-black text-[#0f2b5c] flex items-center gap-2">
                 <User className="w-5 h-5 text-[#0f2b5c]" />
@@ -623,7 +585,7 @@ export default function App() {
               </h2>
 
               <button
-                onClick={() => setShowStudentEditProfileModal(true)}
+                onClick={() => triggerToast("មុខងារកែប្រែព័ត៌មានគណនីគ្រូ")}
                 className="px-4 py-2 bg-[#0f2b5c] hover:bg-blue-900 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5"
               >
                 <Edit className="w-3.5 h-3.5" />
@@ -631,14 +593,10 @@ export default function App() {
               </button>
             </div>
 
-            {/* 3-Column Grid Profile Details Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               
-              {/* Left Card: Profile Image, Name, Role, QR */}
               <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs text-center space-y-5 flex flex-col justify-between">
                 <div className="space-y-4">
-                  
-                  {/* Avatar Photo with Camera Icon */}
                   <div className="relative w-36 h-36 mx-auto">
                     <img
                       src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
@@ -669,7 +627,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* QR Code Section */}
                 <div className="pt-4 border-t border-slate-100 space-y-3">
                   <span className="text-xs font-extrabold text-slate-600 flex items-center justify-center gap-1">
                     <QrCode className="w-4 h-4 text-slate-500" />
@@ -696,10 +653,8 @@ export default function App() {
 
               </div>
 
-              {/* Middle Card: ព័ត៌មានទំនាក់ទំនង & ព័ត៌មានគ្រូបង្រៀន */}
               <div className="lg:col-span-8 space-y-6">
                 
-                {/* ព័ត៌មានទំនាក់ទំនង (Contact Info) */}
                 <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
                   <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b pb-3">
                     <Phone className="w-4 h-4 text-blue-600" />
@@ -729,7 +684,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* ព័ត៌មានគ្រូបង្រៀន (Teacher Info) */}
                 <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
                   <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b pb-3">
                     <Building className="w-4 h-4 text-blue-600" />
@@ -737,7 +691,6 @@ export default function App() {
                   </h3>
 
                   <div className="space-y-3">
-                    {/* គ្រឹះស្ថានសិក្សា */}
                     <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex items-start gap-3">
                       <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl mt-0.5">
                         <Building className="w-5 h-5" />
@@ -752,7 +705,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* ព័ត៌មានថ្នាក់សិក្សា */}
                     <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex items-start gap-3">
                       <div className="p-2 bg-blue-100 text-blue-800 rounded-xl mt-0.5">
                         <UserCheck className="w-5 h-5" />
@@ -769,10 +721,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Right Bottom Widgets: Security, Health, App Update */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  
-                  {/* Security */}
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
                     <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
                       <Shield className="w-4 h-4 text-blue-600" />
@@ -785,7 +734,6 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Health */}
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
                     <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
                       <Heart className="w-4 h-4 text-pink-600" />
@@ -794,7 +742,6 @@ export default function App() {
                     <p className="text-[10px] text-slate-400 italic">មិនមានព័ត៌មានសុខភាព</p>
                   </div>
 
-                  {/* App Updates */}
                   <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2">
                     <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
                       <RefreshCw className="w-4 h-4 text-emerald-600" />
@@ -804,7 +751,6 @@ export default function App() {
                       ធ្វើបច្ចុប្បន្នភាពឥឡូវ
                     </button>
                   </div>
-
                 </div>
 
               </div>
@@ -814,11 +760,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 2. TAB: គ្រប់គ្រងសិស្ស (STUDENT MANAGEMENT & ATTENDANCE) ================= */}
+        {/* ================= 2. TAB: គ្រប់គ្រងសិស្ស (STUDENTS) ================= */}
         {activeTab === "students" && (
           <div className="space-y-6">
             
-            {/* Header controls & stats */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
               <div className="flex items-center gap-2 text-[#0f2b5c]">
                 <UserCheck className="w-5 h-5 text-[#0f2b5c]" />
@@ -838,7 +783,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">
@@ -867,7 +811,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* របារបង្ហាញស្ថិតិ ៥ ប្រអប់ */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
                 <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
@@ -895,7 +838,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* ស្វែងរកសិស្ស */}
             <div className="relative max-w-sm">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               <input
@@ -907,7 +849,6 @@ export default function App() {
               />
             </div>
 
-            {/* កាតសិស្ស */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredList.map((st, i) => (
                 <div
@@ -930,7 +871,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Edit/Delete Actions */}
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => handleEditInit(st)}
@@ -949,7 +889,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* ប៊ូតុងទាំង ៤ វត្តមាន អវត្តមាន យឺត ច្បាប់ */}
                     <div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
                       <button
                         type="button"
@@ -1004,7 +943,6 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* ប្រអប់សរសេរមូលហេតុ */}
                     <AnimatePresence>
                       {st.status !== "Present" && (
                         <motion.div
@@ -1057,11 +995,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 3. TAB: របាយការណ៍ (REPORTS & EXCEL DOWNLOAD) ================= */}
+        {/* ================= 3. TAB: របាយការណ៍ (REPORTS) ================= */}
         {activeTab === "reports" && (
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
             
-            {/* Report Header & Download Button */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -1071,7 +1008,6 @@ export default function App() {
                 <p className="text-xs text-slate-500 mt-0.5">ពិនិត្យ និងទាញយករបាយការណ៍វត្តមានជាឯកសារ Excel/CSV</p>
               </div>
 
-              {/* 📥 ប៊ូតុង DOWNLOAD REPORT */}
               <button
                 onClick={handleDownloadReport}
                 className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 shrink-0"
@@ -1081,7 +1017,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Filter Controls */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1">ជ្រើសរើសថ្ងៃ</label>
@@ -1104,7 +1039,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Attendance Summary Table */}
             <div className="overflow-x-auto border border-slate-200 rounded-2xl">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -1148,7 +1082,7 @@ export default function App() {
 
       </div>
 
-      {/* MODAL បំពេញព័ត៌មានសិស្ស (ADD / EDIT STUDENT MODAL) */}
+      {/* MODAL បំពេញព័ត៌មានសិស្ស */}
       <AnimatePresence>
         {showStudentModal && (
           <motion.div
