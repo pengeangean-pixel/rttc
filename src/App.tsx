@@ -62,7 +62,7 @@ const initialProfile: UserProfile = {
   nationality: "ខ្មែរ | ខ្មែរ",
   pob: "ផ្ទះ១, ទួលព្រះឃ្លាំង, ស្ទឹងត្រង់, ខេត្តកំពង់ចាម",
   currentAddress: "ក្តុលផ្សារ, ទន្លូង, មេមត់, ខេត្តត្បូងឃ្មុំ",
-  schoolName: "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ",
+  schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolCode: "25101401064",
   gradeClass: "ថ្នាក់ទី ៣គ (គ)",
   profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
@@ -76,7 +76,7 @@ const defaultStudentsList: Student[] = [
     gender: "ប្រុស",
     dob: "2004-10-14",
     profilePhoto: "",
-    schoolName: "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ",
+    schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
     phoneNumber: "0961122334",
     telegram: "phanitkrn",
     address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
@@ -91,7 +91,7 @@ const defaultStudentsList: Student[] = [
     gender: "ប្រុស",
     dob: "2003-05-18",
     profilePhoto: "",
-    schoolName: "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ",
+    schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
     phoneNumber: "0968877661",
     telegram: "varinchitra",
     address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
@@ -106,7 +106,7 @@ const defaultStudentsList: Student[] = [
     gender: "ប្រុស",
     dob: "2004-08-05",
     profilePhoto: "",
-    schoolName: "សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ",
+    schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
     phoneNumber: "0889988772",
     telegram: "tichn",
     address: "ក្តុលផ្សារ, ទន្លូង, មេមត់",
@@ -1241,7 +1241,7 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលារៀន</label>
+                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលាកំពុងបង្រើន</label>
                     <input
                       type="text"
                       required
@@ -1346,7 +1346,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="ឧ. ធឿន ផានិត"
+                      placeholder="ឧ. សុខ ពិសី"
                       value={studentForm.name}
                       onChange={(e) => setStudentForm({ ...studentForm, name: e.target.value })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
@@ -1399,10 +1399,10 @@ export default function App() {
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលារៀន</label>
+                    <label className="block font-bold text-slate-600 mb-1">ឈ្មោះសាលាកំពុងបង្រើន</label>
                     <input
                       type="text"
-                      placeholder="សាលាបឋមសិក្សាហ៊ុនសែនក្តុលផ្សារ"
+                      placeholder="មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម"
                       value={studentForm.schoolName}
                       onChange={(e) => setStudentForm({ ...studentForm, schoolName: e.target.value })}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-blue-600 font-semibold"
