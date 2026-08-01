@@ -33,12 +33,13 @@ import {
   Building,
   Phone,
   Send,
-  MapPin
+  MapPin,
+  FileText
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift } from "./types";
 import QRCode from "qrcode";
 
-// បញ្ជីសិស្សលំនាំដើម (លុបប្រធានថ្នាក់ចេញ)
+// បញ្ជីសិស្សលំនាំដើម
 const defaultStudentsList: Student[] = [
   {
     id: "s-101",
@@ -236,11 +237,11 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>(defaultStudentsList);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(() => toLocalISODate(new Date()));
-  const [shift, setShift] = useState<AttendanceShift>("morning"); // ទុកតែ "morning" | "afternoon"
+  const [shift, setShift] = useState<AttendanceShift>("morning");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  // Student Form & Modal (លុបប្រធានថ្នាក់ចេញ)
+  // Student Form & Modal
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const emptyStudentForm: Omit<Student, "id"> = {
@@ -307,12 +308,14 @@ export default function App() {
     generateQR();
   }, [selectedDate, shift]);
 
-  // រក្សាទុកវត្តមានតាម Date + Shift
+  // រក្សាទុកវត្តមាន
   const updateAttendanceStatus = async (studentId: string, newStatus: AttendanceStatus) => {
     const recordId = `${studentId}-${selectedDate}-${shift}`;
-    
     const now = new Date();
     const formattedTime = `${padDateNumber(now.getHours())}:${padDateNumber(now.getMinutes())}`;
+
+    // រក្សាទុកមូលហេតុចាស់ប្រសិនបើមាន
+    const existingRec = attendance.find(r => r.id === recordId);
 
     const newRecord: AttendanceRecord = {
       id: recordId,
@@ -321,7 +324,8 @@ export default function App() {
       shift,
       status: newStatus,
       checkInTime: (newStatus === "Present" || newStatus === "Late") ? formattedTime : "",
-      verifiedByQR: false
+      verifiedByQR: false,
+      absenceNote: newStatus === "Present" ? "" : (existingRec?.absenceNote || "")
     };
 
     try {
@@ -338,6 +342,17 @@ export default function App() {
     }
   };
 
+  // 🔥 មុខងាររក្សាទុកមូលហេតុ (Save Absence/Late/Permission Reason Note)
+  const updateAbsenceNote = async (studentId: string, note: string) => {
+    const recordId = `${studentId}-${selectedDate}-${shift}`;
+    try {
+      await setDoc(doc(db, "attendance", recordId), { absenceNote: note }, { merge: true });
+      triggerToast("បានរក្សាទុកមូលហេតុរួចរាល់!");
+    } catch (err) {
+      console.error("Error saving note:", err);
+    }
+  };
+
   const getDailyList = () => {
     return students.map(st => {
       const recordId = `${st.id}-${selectedDate}-${shift}`;
@@ -345,7 +360,8 @@ export default function App() {
       return {
         ...st,
         status: (rec ? rec.status : "Present") as AttendanceStatus,
-        checkInTime: rec?.checkInTime || ""
+        checkInTime: rec?.checkInTime || "",
+        absenceNote: rec?.absenceNote || ""
       };
     });
   };
@@ -519,7 +535,7 @@ export default function App() {
               </span>
             </div>
 
-            {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន (ទុកតែ ព្រឹក និង រសៀល) */}
+            {/* ជ្រើសរើសកាលបរិច្ឆេទ និង វេន */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">
@@ -593,7 +609,7 @@ export default function App() {
               {filteredList.map((st, i) => (
                 <div
                   key={st.id}
-                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-4 hover:shadow-md transition-all"
+                  className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
@@ -609,6 +625,7 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* ប៊ូតុងទាំង ៤ វត្តមាន អវត្តមាន យឺត ច្បាប់ */}
                   <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
                     <button
                       type="button"
@@ -662,6 +679,53 @@ export default function App() {
                       <span>ច្បាប់</span>
                     </button>
                   </div>
+
+                  {/* 🔥 ប្រអប់សរសេរមូលហេតុ (បង្ហាញស្វ័យប្រវត្តិតែពេលជ្រើសរើស អវត្តមាន យឺត ឬ ច្បាប់) */}
+                  <AnimatePresence>
+                    {st.status !== "Present" && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="pt-2 border-t border-slate-100 space-y-1 overflow-hidden"
+                      >
+                        <label className="block text-[11px] font-extrabold text-slate-600 flex items-center gap-1">
+                          <FileText className="w-3.5 h-3.5 text-blue-600" />
+                          <span>
+                            មូលហេតុ ({st.status === "Absent" || st.status === "Absent_No_Permission" ? "អវត្តមាន" : st.status === "Late" ? "មកយឺត" : "សុំច្បាប់"}) ៖
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="បញ្ចូលមូលហេតុ (ឧ. ឈឺ, ស្ទះផ្លូវ, មានធុរៈ...)"
+                          value={st.absenceNote || ""}
+                          onChange={(e) => {
+                            const newNote = e.target.value;
+                            // កែប្រែ State ក្នុងម៉ាស៊ីនភ្លាមៗ
+                            setAttendance(prev => {
+                              const recordId = `${st.id}-${selectedDate}-${shift}`;
+                              const exists = prev.some(r => r.id === recordId);
+                              if (exists) {
+                                return prev.map(r => r.id === recordId ? { ...r, absenceNote: newNote } : r);
+                              } else {
+                                return [...prev, {
+                                  id: recordId,
+                                  studentId: st.id,
+                                  date: selectedDate,
+                                  shift,
+                                  status: st.status,
+                                  absenceNote: newNote
+                                }];
+                              }
+                            });
+                          }}
+                          onBlur={(e) => updateAbsenceNote(st.id, e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-xs bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 font-semibold text-slate-800 transition-all"
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                 </div>
               ))}
             </div>
@@ -748,7 +812,7 @@ export default function App() {
           </div>
         )}
 
-        {/* MODAL បំពេញព័ត៌មានសិស្ស (លុបប្រធានថ្នាក់ចេញ) */}
+        {/* MODAL បំពេញព័ត៌មានសិស្ស */}
         <AnimatePresence>
           {showStudentModal && (
             <motion.div
@@ -911,7 +975,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= TAB 4: REPORTS ================= */}
+        {/* ================= TAB 4: REPORTS (មានបង្ហាញមូលហេតុ) ================= */}
         {activeTab === "sheets" && (
           <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-4 overflow-x-auto">
             <h3 className="text-base font-extrabold text-slate-900">របាយការណ៍សរុបវត្តមាន ({selectedDate} - {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"})</h3>
@@ -923,6 +987,7 @@ export default function App() {
                   <th className="p-2">ភេទ</th>
                   <th className="p-2">លេខទូរស័ព្ទ</th>
                   <th className="p-2">ស្ថានភាព</th>
+                  <th className="p-2">មូលហេតុ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -939,8 +1004,11 @@ export default function App() {
                         st.status === "Permission" ? "bg-blue-100 text-blue-800" :
                         "bg-red-100 text-red-800"
                       }`}>
-                        {st.status}
+                        {st.status === "Present" ? "វត្តមាន" : st.status === "Late" ? "យឺត" : st.status === "Permission" ? "ច្បាប់" : "អវត្តមាន"}
                       </span>
+                    </td>
+                    <td className="p-2 text-slate-600 italic">
+                      {st.absenceNote || "-"}
                     </td>
                   </tr>
                 ))}
@@ -951,7 +1019,7 @@ export default function App() {
 
       </div>
 
-      {/* 🦶 FOOTER (បន្ថែមមកវិញយ៉ាងស្អាត) */}
+      {/* FOOTER */}
       <footer className="mt-12 py-6 bg-white border-t border-slate-200/80 text-center text-slate-500 text-xs font-sans">
         <p className="font-bold text-slate-700 uppercase tracking-wider mb-1">
           មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម - RTTC Kampong Cham
