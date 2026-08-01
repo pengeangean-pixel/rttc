@@ -6,10 +6,10 @@ export interface Student {
   gender: "Male" | "Female" | "ប្រុស" | "ស្រី";
   dob: string;
 
-  /** Student profile image URL. Kept optional so existing Firestore data still works. */
+  /** Student profile image URL. Optional so existing Firestore data still works. */
   profilePhoto?: string;
 
-  /** Legacy free-text address field kept for compatibility with existing records/import/export. */
+  /** Address fields */
   address: string;
   village?: string;
   commune?: string;
@@ -17,24 +17,43 @@ export interface Student {
   province?: string;
 
   schoolName?: string;
-
   phoneNumber: string;
   telegram: string;
+
+  /** Class Monitor flag */
+  isMonitor?: boolean;
 }
 
-export type AttendanceStatus = "Present" | "Absent_Permission" | "Absent_No_Permission";
+/** 
+ * 4 Core Attendance statuses matching the new UI:
+ * - "Present": វត្តមាន
+ * - "Absent": អវត្តមាន
+ * - "Late": យឺត
+ * - "Permission": ច្បាប់
+ * (Legacy types kept for Firestore backward compatibility)
+ */
+export type AttendanceStatus = 
+  | "Present" 
+  | "Absent" 
+  | "Late" 
+  | "Permission" 
+  | "Absent_Permission" 
+  | "Absent_No_Permission";
+
+export type AttendanceShift = "morning" | "noon" | "afternoon";
 
 export interface AttendanceRecord {
-  id: string; // studentId + date
+  id: string; // studentId + "-" + date
   studentId: string;
   date: string; // YYYY-MM-DD
+  shift?: AttendanceShift; // "morning" | "noon" | "afternoon"
   status: AttendanceStatus;
   checkInTime?: string;
   latitude?: number;
   longitude?: number;
   verifiedByQR?: boolean;
 
-  /** Morning/afternoon absence checkboxes for classroom attendance note taking. */
+  /** Note taking */
   morningAbsent?: boolean;
   afternoonAbsent?: boolean;
   absenceNote?: string;
