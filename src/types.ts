@@ -3,41 +3,45 @@ export type Language = "en" | "km";
 export interface Student {
   id: string;
   name: string;
-  gender: "Male" | "Female" | "ប្រុស" | "ស្រី";
-  dob: string;
-
-  /** Student profile image URL. Kept optional so existing Firestore data still works. */
+  latinName?: string;
+  gender: "Male" | "Female" | "ប្រុស" | "ស្រី" | "M" | "F";
+  dob?: string;
   profilePhoto?: string;
-
-  /** Legacy free-text address field kept for compatibility with existing records/import/export. */
-  address: string;
+  address?: string;
   village?: string;
   commune?: string;
   district?: string;
   province?: string;
-
   schoolName?: string;
-
-  phoneNumber: string;
-  telegram: string;
+  school?: string;
+  phoneNumber?: string;
+  phone?: string;
+  telegram?: string;
 }
 
-export type AttendanceStatus = "Present" | "Absent_Permission" | "Absent_No_Permission";
+export type AttendanceStatus =
+  | "Present"
+  | "Absent_Permission"
+  | "Absent_No_Permission"
+  | "present"
+  | "absent"
+  | "late"
+  | "permission";
 
 export interface AttendanceRecord {
-  id: string; // studentId + date
+  id?: string;
   studentId: string;
   date: string; // YYYY-MM-DD
+  shift?: 'morning' | 'afternoon';
   status: AttendanceStatus;
   checkInTime?: string;
   latitude?: number;
   longitude?: number;
   verifiedByQR?: boolean;
-
-  /** Morning/afternoon absence checkboxes for classroom attendance note taking. */
   morningAbsent?: boolean;
   afternoonAbsent?: boolean;
   absenceNote?: string;
+  note?: string;
 }
 
 export interface GeofenceConfig {
@@ -45,22 +49,4 @@ export interface GeofenceConfig {
   longitude: number;
   radius: number; // in meters
   isEnabled: boolean;
-}
-export interface Student {
-  id: string;
-  name: string;
-  latinName?: string;
-  gender: 'M' | 'F';
-  phone?: string;
-  telegram?: string;
-  school?: string;
-}
-
-export interface AttendanceRecord {
-  id?: string;
-  studentId: string;
-  date: string;
-  shift: 'morning' | 'afternoon'; // <<-- បន្ថែមចំណុចនេះ
-  status: 'present' | 'absent' | 'late' | 'permission';
-  note?: string;
 }
