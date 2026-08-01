@@ -68,11 +68,11 @@ const initialProfile: UserProfile = {
   dob: "1997-10-08",
   phone: "0886722609",
   nationality: "ខ្មែរ | ខ្មែរ",
-  pob: "ផ្ទះ១, ទួលព្រះឃ្លាំង, ស្ទឹងត្រង់, ខេត្តកំពង់ចាម",
+  pob: "ភូមិដូនទរ, ឃុំទួលព្រះឃ្លាំង, ស្រុកស្ទឹងត្រង់, ខេត្តកំពង់ចាម",
   currentAddress: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolCode: "25101401064",
-  gradeClass: "ថ្នាក់ទី ៣គ (គ)",
+  gradeClass: "ថ្នាក់ទី",
   profilePhoto: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"
 };
 
