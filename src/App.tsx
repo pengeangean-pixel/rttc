@@ -1171,11 +1171,11 @@ export default function App() {
               <div className="space-y-2 text-center md:text-left">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-amber-300 backdrop-blur-xs">
                   <GraduationCap className="w-4 h-4" />
-                  <span>ប្រព័ន្ធគ្រប់គ្រងសាលារៀន និងវត្តមានសិស្ស</span>
+                  <span>ប្រព័ន្ធគ្រប់គ្រងវត្តមានគរុនិស្សិត R01</span>
                 </div>
                 <h2 className="text-xl md:text-2xl font-black">{userProfile.schoolName}</h2>
                 <p className="text-xs text-blue-200">
-                  លោកគ្រូ៖ <strong>{userProfile.name}</strong> • ទទួលបន្ទុក៖ <strong>{userProfile.gradeClass}</strong>
+                  អ្នកគ្រប់គ្រងវត្តមាន៖ <strong>{userProfile.name}</strong> • ប្រធានថ្នាក់ <strong>{userProfile.gradeClass}</strong>
                 </p>
               </div>
 
@@ -1188,12 +1188,12 @@ export default function App() {
               </button>
             </div>
 
-            {/* Dashboard វត្តមានសិស្ស */}
+            {/* Dashboard វត្តមាន */}
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#0f2b5c]">
                   <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
-                  <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
+                  <h2 className="text-lg font-extrabold tracking-tight">វត្តមាន (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
                 </div>
                 <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
                   {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
@@ -1447,7 +1447,7 @@ export default function App() {
                   
                   <div className="relative w-36 h-36 mx-auto">
                     <img
-                      src={userProfile.profilePhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"}
+                      src={userProfile.profilePhoto || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTDTgxGtJAQIkIgetyLzTEIeu1EHSwZvTJpMNQiNzjpt6Ve_vKnTY7CKqs&s=10"}
                       alt={userProfile.name}
                       className="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-md mx-auto"
                     />
@@ -1520,7 +1520,7 @@ export default function App() {
                     </div>
 
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                      <span className="text-slate-400 block text-[11px]">សញ្ជាតិ | អម្បូរ</span>
+                      <span className="text-slate-400 block text-[11px]">សញ្ជាតិ | ជនជាតិ</span>
                       <strong className="text-slate-900 block">{userProfile.nationality}</strong>
                     </div>
 
@@ -1729,69 +1729,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => updateAttendanceStatus(st.id, "Present")}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                            st.status === "Present"
-                              ? "bg-emerald-600 text-white shadow-xs"
-                              : "text-emerald-700 hover:bg-emerald-50"
-                          }`}
-                        >
-                          <Check className="w-4 h-4 mb-0.5" />
-                          <span>វត្តមាន</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => updateAttendanceStatus(st.id, "Absent")}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                            st.status === "Absent" || st.status === "Absent_No_Permission"
-                              ? "bg-red-600 text-white shadow-xs"
-                              : "text-red-700 hover:bg-red-50"
-                          }`}
-                        >
-                          <X className="w-4 h-4 mb-0.5" />
-                          <span>អវត្តមាន</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => updateAttendanceStatus(st.id, "Late")}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                            st.status === "Late"
-                              ? "bg-amber-500 text-white shadow-xs"
-                              : "text-amber-700 hover:bg-amber-50"
-                          }`}
-                        >
-                          <Clock className="w-4 h-4 mb-0.5" />
-                          <span>យឺត</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => updateAttendanceStatus(st.id, "Permission")}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                            st.status === "Permission" || st.status === "Absent_Permission"
-                              ? "bg-blue-600 text-white shadow-xs"
-                              : "text-blue-700 hover:bg-blue-50"
-                          }`}
-                        >
-                          <Calendar className="w-4 h-4 mb-0.5" />
-                          <span>ច្បាប់</span>
-                        </button>
-                      </div>
-
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ================= 📊 4. TAB: របាយការណ៍ ================= */}
+{/* ================= 📊 4. TAB: របាយការណ៍ ================= */}
         {activeTab === "reports" && (
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
             
