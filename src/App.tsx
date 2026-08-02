@@ -1728,7 +1728,67 @@ export default function App() {
                           </button>
                         </div>
                       </div>
+<div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Present")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Present"
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : "text-emerald-700 hover:bg-emerald-50"
+                          }`}
+                        >
+                          <Check className="w-4 h-4 mb-0.5" />
+                          <span>វត្តមាន</span>
+                        </button>
 
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Absent")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Absent" || st.status === "Absent_No_Permission"
+                              ? "bg-red-600 text-white shadow-xs"
+                              : "text-red-700 hover:bg-red-50"
+                          }`}
+                        >
+                          <X className="w-4 h-4 mb-0.5" />
+                          <span>អវត្តមាន</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Late")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Late"
+                              ? "bg-amber-500 text-white shadow-xs"
+                              : "text-amber-700 hover:bg-amber-50"
+                          }`}
+                        >
+                          <Clock className="w-4 h-4 mb-0.5" />
+                          <span>យឺត</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Permission")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Permission" || st.status === "Absent_Permission"
+                              ? "bg-blue-600 text-white shadow-xs"
+                              : "text-blue-700 hover:bg-blue-50"
+                          }`}
+                        >
+                          <Calendar className="w-4 h-4 mb-0.5" />
+                          <span>ច្បាប់</span>
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 {/* ================= 📊 4. TAB: របាយការណ៍ ================= */}
         {activeTab === "reports" && (
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
