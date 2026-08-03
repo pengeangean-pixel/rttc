@@ -425,14 +425,19 @@ export default function App() {
     }
   };
 
-  // LOGOUT
-  const handleLogoutUser = () => {
-    signOut(auth);
+  // LOGOUT (កែសម្រួលបន្ថែម async/await សម្រាប់ការចាកចេញរលូន)
+  const handleLogoutUser = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
     setCurrentUser(null);
     setAdminEmail("");
     setAdminPass("");
     setStudentInputQuery("");
     setShowPassword(false);
+    setShowLogoutConfirmModal(false);
     triggerToast("បានចាកចេញពីប្រព័ន្ធ!");
   };
 
@@ -1043,6 +1048,54 @@ export default function App() {
           </div>
         </div>
 
+        {/* Modal បញ្ជាក់ការចាកចេញសម្រាប់សិស្ស */}
+        <AnimatePresence>
+          {showLogoutConfirmModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
+            >
+              <motion.div
+                initial={{ scale: 0.95, y: 15 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.95, y: 15 }}
+                className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center space-y-4"
+              >
+                <div className="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+                  <LogOut className="w-7 h-7" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="text-base font-black text-slate-900">បញ្ជាក់ការចាកចេញ</h3>
+                  <p className="text-xs text-slate-500 font-semibold">
+                    តើអ្នកពិតជាចង់ចាកចេញពីប្រព័ន្ធមែនទេ?
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-3 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setShowLogoutConfirmModal(false)}
+                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  >
+                    បោះបង់
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogoutUser}
+                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>យល់ព្រមចាកចេញ</span>
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <footer className="mt-12 py-6 bg-white border-t border-slate-200/80 text-center text-slate-500 text-xs font-sans">
           <p className="font-bold text-slate-700 uppercase tracking-wider mb-1">
             {userProfile.schoolName}
@@ -1242,7 +1295,7 @@ export default function App() {
                 />
               </div>
 
-              {/* កាតសិស្ស (ទំព័រដើម - លុបប៊ូតុងកែប្រែ/លុបចេញ) */}
+              {/* កាតសិស្ស */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
                 {filteredList.map((st, i) => (
                   <div
@@ -1556,7 +1609,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស (លុបប៊ូតុងកត់ត្រាវត្តមានចេញ) ================= */}
+        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស ================= */}
         {activeTab === "students" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
@@ -1616,7 +1669,6 @@ export default function App() {
               )}
             </div>
 
-            {/* កាតសិស្សក្នុងទំព័រគ្រប់គ្រងសិស្ស (គ្មានមុខងារកត់ត្រាវត្តមាន) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
               {filteredList.map((st, i) => {
                 const isSelected = selectedStudentIds.includes(st.id);
@@ -1674,7 +1726,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* បង្ហាញព័ត៌មានលម្អិតសិស្ស */}
                       <div className="mt-3 pt-3 border-t border-slate-100 text-xs space-y-1.5 text-slate-600">
                         <div className="flex justify-between">
                           <span className="text-slate-400">ភេទ / ថ្ងៃកំណើត៖</span>
@@ -1784,7 +1835,7 @@ export default function App() {
 
       </div>
 
-      {/* MODAL បញ្ជាក់ការចាកចេញ */}
+      {/* MODAL បញ្ជាក់ការចាកចេញសម្រាប់ ADMIN */}
       <AnimatePresence>
         {showLogoutConfirmModal && (
           <motion.div
@@ -1820,10 +1871,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowLogoutConfirmModal(false);
-                    handleLogoutUser();
-                  }}
+                  onClick={handleLogoutUser}
                   className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
