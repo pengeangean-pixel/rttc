@@ -26,7 +26,6 @@ import {
   X, 
   Check, 
   LogOut, 
-  Globe, 
   ChevronLeft, 
   ChevronRight, 
   Clock,
@@ -34,8 +33,6 @@ import {
   Save,
   Building,
   Phone,
-  Send,
-  MapPin,
   FileText,
   User,
   UserCheck,
@@ -280,7 +277,7 @@ export default function App() {
   const [adminPass, setAdminPass] = useState("");
   const [studentInputQuery, setStudentInputQuery] = useState("");
 
-  // 🔥 State បង្ហាញ ឬបិទលេខសម្ងាត់ (Show/Hide Password Toggle)
+  // Toggle Password Display
   const [showPassword, setShowPassword] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"home" | "account" | "students" | "reports">("home");
@@ -322,7 +319,7 @@ export default function App() {
   const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
 
   // Firebase User & QR
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -341,7 +338,7 @@ export default function App() {
       }
     });
     return () => unsub();
-  }, []);
+  }, [userProfile.name]);
 
   // Generate Profile QR Code
   useEffect(() => {
@@ -845,7 +842,7 @@ export default function App() {
             </form>
           )}
 
-          {/* Form 2: Admin Login (មានប៊ូតុងបង្ហាញ/បិទលេខសម្ងាត់) */}
+          {/* Form 2: Admin Login */}
           {loginRoleTab === "admin" && (
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-1">
@@ -868,7 +865,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 🔥 លេខសម្ងាត់ ( password toggle eye icon ) */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">លេខសម្ងាត់ (Password) *</label>
                 <div className="relative">
@@ -881,7 +877,6 @@ export default function App() {
                     onChange={(e) => setAdminPass(e.target.value)}
                     className="w-full pl-9 pr-10 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
                   />
-                  {/* ប៊ូតុងរូបភ្នែក Toggle */}
                   <button
                     type="button"
                     onClick={() => setShowPassword(prev => !prev)}
@@ -924,8 +919,6 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
-        
-        {/* Toast */}
         <AnimatePresence>
           {toast && (
             <motion.div 
@@ -941,8 +934,6 @@ export default function App() {
         </AnimatePresence>
 
         <div className="max-w-4xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
-          
-          {/* Header Student View */}
           <header className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-[#0f2b5c] text-white font-black flex items-center justify-center text-lg shadow-sm">
@@ -954,7 +945,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* ប៊ូតុងចាកចេញ (ជាមួយ Modal សួរបញ្ជាក់) */}
             <button
               onClick={() => setShowLogoutConfirmModal(true)}
               className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-red-200/80 shadow-2xs cursor-pointer"
@@ -964,7 +954,6 @@ export default function App() {
             </button>
           </header>
 
-          {/* Student Welcome Card */}
           <div className="bg-gradient-to-r from-[#0f2b5c] to-blue-900 text-white p-6 rounded-3xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="space-y-1 text-center sm:text-left">
               <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">ទំព័របង្ហាញវត្តមានផ្ទាល់ខ្លួន</span>
@@ -978,7 +967,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* Personal Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
               <span className="text-2xl font-black text-emerald-600 block mb-1">{stPresent}</span>
@@ -1001,7 +989,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* History Records Table */}
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
               <FileText className="w-5 h-5 text-blue-600" />
@@ -1054,10 +1041,8 @@ export default function App() {
               </table>
             </div>
           </div>
-
         </div>
 
-        {/* Footer */}
         <footer className="mt-12 py-6 bg-white border-t border-slate-200/80 text-center text-slate-500 text-xs font-sans">
           <p className="font-bold text-slate-700 uppercase tracking-wider mb-1">
             {userProfile.schoolName}
@@ -1073,8 +1058,6 @@ export default function App() {
   // ================= 🔑 ADMIN FULL MANAGEMENT PORTAL VIEW =================
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
-      
-      {/* Hidden File Input */}
       <input
         type="file"
         ref={fileInputRef}
@@ -1083,7 +1066,6 @@ export default function App() {
         className="hidden"
       />
 
-      {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
           <motion.div 
@@ -1100,12 +1082,9 @@ export default function App() {
 
       <div className="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
         
-        {/* 🔝 TOP NAVIGATION BAR (ប៊ូតុងចាកចេញ) */}
+        {/* 🔝 TOP NAVIGATION BAR */}
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-          
           <nav className="flex space-x-1.5 w-full sm:w-auto overflow-x-auto">
-            
-            {/* 🎓 1. HOME TAB */}
             <button
               onClick={() => setActiveTab("home")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -1116,7 +1095,6 @@ export default function App() {
               <span>ទំព័រដើម</span>
             </button>
 
-            {/* 👤 2. ACCOUNT TAB */}
             <button
               onClick={() => setActiveTab("account")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -1127,7 +1105,6 @@ export default function App() {
               <span>គណនីខ្ញុំ</span>
             </button>
 
-            {/* 👨‍🎓 3. STUDENTS TAB */}
             <button
               onClick={() => setActiveTab("students")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -1138,7 +1115,6 @@ export default function App() {
               <span>គ្រប់គ្រងសិស្ស</span>
             </button>
 
-            {/* 📊 4. REPORTS TAB */}
             <button
               onClick={() => setActiveTab("reports")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -1150,7 +1126,6 @@ export default function App() {
             </button>
           </nav>
 
-          {/* 🔥 ប៊ូតុងចាកចេញ (ជំនួសប៊ូតុងភាសា) */}
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <button
               onClick={() => setShowLogoutConfirmModal(true)}
@@ -1162,11 +1137,9 @@ export default function App() {
           </div>
         </header>
 
-        {/* ================= 🎓 1. HOME TAB ================= */}
+        {/* ================= 🎓 1. HOME TAB (ទំព័រដើម) ================= */}
         {activeTab === "home" && (
           <div className="space-y-6">
-            
-            {/* Welcome Banner */}
             <div className="bg-gradient-to-r from-[#0f2b5c] via-blue-900 to-slate-900 text-white p-6 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="space-y-2 text-center md:text-left">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-amber-300 backdrop-blur-xs">
@@ -1269,7 +1242,7 @@ export default function App() {
                 />
               </div>
 
-              {/* កាតសិស្ស */}
+              {/* កាតសិស្ស (ទំព័រដើម - លុបប៊ូតុងកែប្រែ/លុបចេញ) */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
                 {filteredList.map((st, i) => (
                   <div
@@ -1277,36 +1250,17 @@ export default function App() {
                     className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all flex flex-col justify-between"
                   >
                     <div>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
-                            {i + 1}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
-                              {st.name}
-                            </h4>
-                            <p className="text-xs text-slate-400 font-mono truncate">
-                              {st.telegram || st.phoneNumber || `student_${i + 1}`}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
+                          {i + 1}
                         </div>
-
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleEditInit(st)}
-                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="កែប្រែ"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteStudent(st.id, st.name)}
-                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="លុប"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
+                            {st.name}
+                          </h4>
+                          <p className="text-xs text-slate-400 font-mono truncate">
+                            {st.telegram || st.phoneNumber || `student_${i + 1}`}
+                          </p>
                         </div>
                       </div>
 
@@ -1408,20 +1362,17 @@ export default function App() {
                           </motion.div>
                         )}
                       </AnimatePresence>
-
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-
           </div>
         )}
 
         {/* ================= 👤 2. ACCOUNT TAB ================= */}
         {activeTab === "account" && (
           <div className="space-y-6">
-            
             <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
               <h2 className="text-lg font-black text-[#0f2b5c] flex items-center gap-2">
                 <User className="w-5 h-5 text-[#0f2b5c]" />
@@ -1441,10 +1392,8 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              
               <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs text-center space-y-5 flex flex-col justify-between">
                 <div className="space-y-4">
-                  
                   <div className="relative w-36 h-36 mx-auto">
                     <img
                       src={userProfile.profilePhoto || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTDTgxGtJAQIkIgetyLzTEIeu1EHSwZvTJpMNQiNzjpt6Ve_vKnTY7CKqs&s=10"}
@@ -1502,11 +1451,9 @@ export default function App() {
                     </a>
                   </div>
                 </div>
-
               </div>
 
               <div className="lg:col-span-8 space-y-6">
-                
                 <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
                   <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b pb-3">
                     <Phone className="w-4 h-4 text-blue-600" />
@@ -1604,15 +1551,12 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-
               </div>
-
             </div>
-
           </div>
         )}
 
-        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស ================= */}
+        {/* ================= 👨‍🎓 3. TAB: គ្រប់គ្រងសិស្ស (លុបប៊ូតុងកត់ត្រាវត្តមានចេញ) ================= */}
         {activeTab === "students" && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
@@ -1672,6 +1616,7 @@ export default function App() {
               )}
             </div>
 
+            {/* កាតសិស្សក្នុងទំព័រគ្រប់គ្រងសិស្ស (គ្មានមុខងារកត់ត្រាវត្តមាន) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[750px] overflow-y-auto pr-1">
               {filteredList.map((st, i) => {
                 const isSelected = selectedStudentIds.includes(st.id);
@@ -1684,7 +1629,7 @@ export default function App() {
                   >
                     <div>
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <button
                             type="button"
                             onClick={() => toggleSelectStudent(st.id)}
@@ -1706,82 +1651,46 @@ export default function App() {
                               {st.name}
                             </h4>
                             <p className="text-xs text-slate-400 font-mono truncate">
-                              {st.telegram || st.phoneNumber || `student_${i + 1}`}
+                              {st.telegram ? `@${st.telegram.replace(/^@/, '')}` : (st.phoneNumber || `student_${i + 1}`)}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 shrink-0">
                           <button
                             onClick={() => handleEditInit(st)}
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="កែប្រែ"
                           >
-                            <Edit className="w-3.5 h-3.5" />
+                            <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteStudent(st.id, st.name)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="លុប"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
-<div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => updateAttendanceStatus(st.id, "Present")}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                            st.status === "Present"
-                              ? "bg-emerald-600 text-white shadow-xs"
-                              : "text-emerald-700 hover:bg-emerald-50"
-                          }`}
-                        >
-                          <Check className="w-4 h-4 mb-0.5" />
-                          <span>វត្តមាន</span>
-                        </button>
 
-                        <button
-                          type="button"
-                          onClick={() => updateAttendanceStatus(st.id, "Absent")}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                            st.status === "Absent" || st.status === "Absent_No_Permission"
-                              ? "bg-red-600 text-white shadow-xs"
-                              : "text-red-700 hover:bg-red-50"
-                          }`}
-                        >
-                          <X className="w-4 h-4 mb-0.5" />
-                          <span>អវត្តមាន</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => updateAttendanceStatus(st.id, "Late")}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                            st.status === "Late"
-                              ? "bg-amber-500 text-white shadow-xs"
-                              : "text-amber-700 hover:bg-amber-50"
-                          }`}
-                        >
-                          <Clock className="w-4 h-4 mb-0.5" />
-                          <span>យឺត</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => updateAttendanceStatus(st.id, "Permission")}
-                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
-                            st.status === "Permission" || st.status === "Absent_Permission"
-                              ? "bg-blue-600 text-white shadow-xs"
-                              : "text-blue-700 hover:bg-blue-50"
-                          }`}
-                        >
-                          <Calendar className="w-4 h-4 mb-0.5" />
-                          <span>ច្បាប់</span>
-                        </button>
+                      {/* បង្ហាញព័ត៌មានលម្អិតសិស្ស */}
+                      <div className="mt-3 pt-3 border-t border-slate-100 text-xs space-y-1.5 text-slate-600">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">ភេទ / ថ្ងៃកំណើត៖</span>
+                          <span className="font-semibold text-slate-800">{st.gender} • {st.dob || "-"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">លេខទូរស័ព្ទ៖</span>
+                          <span className="font-mono font-semibold text-slate-800">{st.phoneNumber || "-"}</span>
+                        </div>
+                        {st.address && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">អាសយដ្ឋាន៖</span>
+                            <span className="font-semibold text-slate-800 truncate max-w-[180px]">{st.address}</span>
+                          </div>
+                        )}
                       </div>
-
                     </div>
                   </div>
                 );
@@ -1789,10 +1698,10 @@ export default function App() {
             </div>
           </div>
         )}
-{/* ================= 📊 4. TAB: របាយការណ៍ ================= */}
+
+        {/* ================= 📊 4. TAB: របាយការណ៍ ================= */}
         {activeTab === "reports" && (
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
-            
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -1870,13 +1779,12 @@ export default function App() {
                 </tbody>
               </table>
             </div>
-
           </div>
         )}
 
       </div>
 
-      {/* 🔥 MODAL បញ្ជាក់ការចាកចេញ (LOGOUT CONFIRMATION MODAL) */}
+      {/* MODAL បញ្ជាក់ការចាកចេញ */}
       <AnimatePresence>
         {showLogoutConfirmModal && (
           <motion.div
