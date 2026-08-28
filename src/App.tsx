@@ -29,32 +29,28 @@ import {
   Globe, 
   ChevronLeft, 
   ChevronRight, 
-  Clock,
-  UserPlus,
-  Save,
-  Building,
-  Phone,
-  Send,
-  MapPin,
-  FileText,
-  User,
-  UserCheck,
-  Shield,
-  Heart,
-  RefreshCw,
-  Lock,
-  Download,
-  Camera,
-  Key,
-  QrCode,
-  GraduationCap,
-  FileSpreadsheet,
-  Upload,
-  CheckSquare,
-  Square,
-  LogIn,
-  Sparkles,
-  Award
+  Clock, 
+  UserPlus, 
+  Save, 
+  Building, 
+  Phone, 
+  FileText, 
+  User, 
+  UserCheck, 
+  Shield, 
+  Heart, 
+  RefreshCw, 
+  Lock, 
+  Download, 
+  Camera, 
+  Key, 
+  QrCode, 
+  GraduationCap, 
+  FileSpreadsheet, 
+  Upload, 
+  CheckSquare, 
+  Square, 
+  LogIn 
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile, CurrentUser } from "./types";
 import QRCode from "qrcode";
@@ -315,7 +311,7 @@ export default function App() {
   const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
 
   // Firebase User & QR
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -334,7 +330,7 @@ export default function App() {
       }
     });
     return () => unsub();
-  }, []);
+  }, [userProfile.name]);
 
   // Generate Profile QR Code
   useEffect(() => {
@@ -402,10 +398,9 @@ export default function App() {
       return;
     }
 
-    // ស្វែងរកសិស្សក្នុងបញ្ជី
     const matched = students.find(s => 
       s.phoneNumber.includes(queryStr) || 
-      s.telegram.toLowerCase().includes(queryStr) ||
+      s.telegram.toLowerCase().includes(queryStr) || 
       s.name.toLowerCase().includes(queryStr)
     );
 
@@ -457,28 +452,7 @@ export default function App() {
     triggerToast("បានទាញយកតារាងគំរូ CSV រួចរាល់!");
   };
 
-  // មុខងារ Parse CSV ទៅជា Columns ដោយស្វ័យប្រវត្តិ
-  const parseCSVRow = (rowStr: string): string[] => {
-    const result: string[] = [];
-    let current = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < rowStr.length; i++) {
-      const char = rowStr[i];
-      if (char === '"' || char === "'") {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim().replace(/^["']|["']$/g, ""));
-        current = "";
-      } else {
-        current += char;
-      }
-    }
-    result.push(current.trim().replace(/^["']|["']$/g, ""));
-    return result;
-  };
-
- // មុខងារ Parse CSV Row
+  // មុខងារ Parse CSV Row
   const parseCSVRow = (rowStr: string): string[] => {
     const result: string[] = [];
     let current = "";
@@ -636,6 +610,7 @@ export default function App() {
     reader.readAsText(file, "UTF-8");
     e.target.value = "";
   };
+
   // Bulk Delete
   const toggleSelectStudent = (id: string) => {
     setSelectedStudentIds(prev => 
@@ -850,7 +825,7 @@ export default function App() {
   const dailyList = getDailyList();
   const filteredList = dailyList.filter(s => 
     s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.phoneNumber.includes(searchQuery) ||
+    s.phoneNumber.includes(searchQuery) || 
     s.telegram.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
