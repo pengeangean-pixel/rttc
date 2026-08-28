@@ -465,7 +465,7 @@ export default function App() {
     triggerToast("បានទាញយកតារាងគំរូ CSV រួចរាល់!");
   };
 
-  // Upload CSV សិស្សច្រើននាក់
+ // Upload CSV ដើម្បីធ្វើបច្ចុប្បន្នភាពព័ត៌មានសិស្ស (មិនបង្កើតថ្មី និងមិនជាន់ពីលើតម្លៃទទេ)
   const handleCSVImportUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -481,72 +481,105 @@ export default function App() {
           return;
         }
 
-        const parsedStudents: Student[] = [];
+        let updatedCount = 0;
+        let skippedCount = 0;
+        const updatedStudentsList: Student[] = [];
+        const batch = writeBatch(db);
+
         for (let i = 1; i < lines.length; i++) {
           const row = lines[i].split(",").map(val => val.trim().replace(/^["']|["']$/g, ""));
-          if (row.length >= 2 && row[1]) {
-            const id = row[0] || `st-${Date.now()}-${i}`;
-            const name = row[1];
-            const gender = (row[2] === "ស្រី" || row[2]?.toLowerCase() === "female") ? "ស្រី" : "ប្រុស";
-            const dob = row[3] || "2004-01-01";
-            const phoneNumber = row[4] || "0960000000";
-            const telegram = row[5] || "";
-            const schoolName = row[6] || userProfile.schoolName;
-            const village = row[7] || "";
-            const commune = row[8] || "";
-            const district = row[9] || "";
-            const province = row[10] || "";
-            const address = [village, commune, district, province].filter(Boolean).join(", ") || "ខេត្តកំពង់ចាម";
+          
+          // រំលងជួរណាដែលគ្មានឈ្មោះសិស្ស
+          if (row.length < 2 || !row[1]) continue;
 
-            parsedStudents.push({
-              id,
-              name,
-              gender,
-              dob,
-              phoneNumber,
-              telegram,
-              schoolName,
-              village,
-              commune,
-              district,
-              province,
-              address
-            });
+          const csvId = row[0];
+          const csvName = row[1];
+          const csvGender = row[2];
+          const csvDob = row[3];
+          const csvPhone = row[4];
+          const csvTelegram = row[5];
+          const csvSchool = row[6];
+          const csvVillage = row[7];
+          const csvCommune = row[8];
+          const csvDistrict = row[9];
+          const csvProvince = row[10];
+
+          // ១. ស្វែងរកសិស្សដែលមានស្រាប់ក្នុងប្រព័ន្ធ (ស្វែងរកតាម ID ឬ លេខទូរស័ព្ទ)
+          const existingStudent = students.find(s => 
+            (csvId && s.id === csvId) || 
+            (csvPhone && s.phoneNumber === csvPhone)
+          );
+
+          // បើរកមិនឃើញសិស្សនេះក្នុងប្រព័ន្ធទេ គឺមិនបញ្ចូលថ្មីឡើយ (Skip)
+          if (!existingStudent) {
+            skippedCount++;
+            continue;
           }
+
+          // ២. បង្កើត Object សម្រាប់ Update (បញ្ចូលតែព័ត៌មានណាដែលមានតម្លៃ មិនទទេ)
+          const updatedData: Partial<Student> = { ...existingStudent };
+
+          if (csvName) updatedData.name = csvName;
+          if (csvGender) {
+            updatedData.gender = (csvGender === "ស្រី" || csvGender.toLowerCase() === "female") ? "ស្រី" : "ប្រុស";
+          }
+          if (csvDob) updatedData.dob = csvDob;
+          if (csvPhone) updatedData.phoneNumber = csvPhone;
+          if (csvTelegram) updatedData.telegram = csvTelegram;
+          if (csvSchool) updatedData.schoolName = csvSchool;
+          if (csvVillage) updatedData.village = csvVillage;
+          if (csvCommune) updatedData.commune = csvCommune;
+          if (csvDistrict) updatedData.district = csvDistrict;
+          if (csvProvince) updatedData.province = csvProvince;
+
+          // បើមានការបញ្ជាក់អាសយដ្ឋានណាមួយ ទើបធ្វើការផ្សំវាចូលគ្នាជា Address ថ្មី
+          if (csvVillage || csvCommune || csvDistrict || csvProvince) {
+            const v = csvVillage || existingStudent.village || "";
+            const c = csvCommune || existingStudent.commune || "";
+            const d = csvDistrict || existingStudent.district || "";
+            const p = csvProvince || existingStudent.province || "";
+            updatedData.address = [v, c, d, p].filter(Boolean).join(", ");
+          }
+
+          // រៀបចំទុកសម្រាប់ធ្វើបច្ចុប្បន្នភាពក្នុង Firestore Batch
+          batch.set(
+            doc(db, "students", existingStudent.id), 
+            removeUndefinedFields(updatedData), 
+            { merge: true } // ជម្រើស { merge: true } ការពារមិនឱ្យបាត់បង់រូបភាព ProfilePhoto ឬទិន្នន័យផ្សេងទៀត
+          );
+
+          updatedStudentsList.push(updatedData as Student);
+          updatedCount++;
         }
 
-        if (parsedStudents.length === 0) {
-          triggerToast("⚠️ មិនមានទិន្នន័យសិស្សត្រឹមត្រូវទេ!");
+        if (updatedCount === 0) {
+          triggerToast("⚠️ មិនមានទិន្នន័យសិស្សណាមួយត្រូវបានធ្វើបច្ចុប្បន្នភាពឡើយ (រកមិនឃើញសិស្សក្នុងប្រព័ន្ធ)!");
           return;
         }
 
-        const batch = writeBatch(db);
-        parsedStudents.forEach(st => {
-          batch.set(doc(db, "students", st.id), removeUndefinedFields(st));
-        });
+        // រុញទិន្នន័យទាំងអស់ទៅកាន់ Firestore ក្នុងពេលតែមួយ
         await batch.commit();
 
+        // ធ្វើបច្ចុប្បន្នភាព State នៅក្នុង UI
         setStudents(prev => {
           const merged = [...prev];
-          parsedStudents.forEach(newSt => {
-            const idx = merged.findIndex(s => s.id === newSt.id);
-            if (idx >= 0) merged[idx] = newSt;
-            else merged.push(newSt);
+          updatedStudentsList.forEach(upSt => {
+            const idx = merged.findIndex(s => s.id === upSt.id);
+            if (idx >= 0) merged[idx] = upSt;
           });
           return merged;
         });
 
         setShowCSVModal(false);
-        triggerToast(`បាននាំចូលសិស្សចំនួន ${parsedStudents.length} នាក់ជោគជ័យ!`);
+        triggerToast(`ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាពសិស្សចំនួន ${updatedCount} នាក់ (រំលងមិនបញ្ចូលសិស្សថ្មីចំនួន ${skippedCount} នាក់)`);
       } catch (err) {
-        console.error("Error reading CSV:", err);
-        triggerToast("មានបញ្ហាក្នុងការអានឯកសារ CSV");
+        console.error("Error updating CSV:", err);
+        triggerToast("មានបញ្ហាក្នុងការអាន ឬកត់ត្រាឯកសារ CSV");
       }
     };
     reader.readAsText(file, "UTF-8");
     e.target.value = "";
   };
-
   // Bulk Delete
   const toggleSelectStudent = (id: string) => {
     setSelectedStudentIds(prev => 
