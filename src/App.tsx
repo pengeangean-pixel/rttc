@@ -26,6 +26,7 @@ import {
   X, 
   Check, 
   LogOut, 
+  Globe, 
   ChevronLeft, 
   ChevronRight, 
   Clock,
@@ -33,6 +34,8 @@ import {
   Save,
   Building,
   Phone,
+  Send,
+  MapPin,
   FileText,
   User,
   UserCheck,
@@ -50,13 +53,12 @@ import {
   CheckSquare,
   Square,
   LogIn,
-  Eye,
-  EyeOff
+  Sparkles,
+  Award
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile, CurrentUser } from "./types";
 import QRCode from "qrcode";
 
-// ព័ត៌មានគណនីដើម
 const initialProfile: UserProfile = {
   name: "អ៊ាន ប៉េងអ៊ាង",
   role: "គ្រូបង្រៀន",
@@ -65,7 +67,7 @@ const initialProfile: UserProfile = {
   dob: "1997-10-08",
   phone: "0886722609",
   nationality: "ខ្មែរ | ខ្មែរ",
-  pob: "ភូមិដូនទរ, ឃុំទួលព្រះឃ្លាំង, ស្រុកស្ទឹងត្រង់, ខេត្តកំពង់ចាម",
+  pob: "ផ្ទះ១, ទួលព្រះឃ្លាំង, ស្ទឹងត្រង់, ខេត្តកំពង់ចាម",
   currentAddress: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolName: "មជ្ឈមណ្ឌលគរុកោសល្យភូមិភាគខេត្តកំពង់ចាម",
   schoolCode: "25101401064",
@@ -263,22 +265,16 @@ const PremiumDatePicker = ({ id, value, onChange, lang, placeholder }: PremiumDa
 };
 
 export default function App() {
-  const [lang] = useState<"km" | "en">("km");
+  const [lang, setLang] = useState<"km" | "en">("km");
   
-  // LOGIN & AUTH ROLES STATE
+  // 🔥 LOGIN & AUTH ROLES STATE
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [loginRoleTab, setLoginRoleTab] = useState<"admin" | "student">("student");
   
-  // MODAL សួរបញ្ជាក់ការចាកចេញ
-  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
-
   // Inputs Login
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPass, setAdminPass] = useState("");
   const [studentInputQuery, setStudentInputQuery] = useState("");
-
-  // Toggle Password Display
-  const [showPassword, setShowPassword] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"home" | "account" | "students" | "reports">("home");
 
@@ -319,7 +315,7 @@ export default function App() {
   const [studentForm, setStudentForm] = useState<Omit<Student, "id">>(emptyStudentForm);
 
   // Firebase User & QR
-  const [, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -338,7 +334,7 @@ export default function App() {
       }
     });
     return () => unsub();
-  }, [userProfile.name]);
+  }, []);
 
   // Generate Profile QR Code
   useEffect(() => {
@@ -378,7 +374,7 @@ export default function App() {
     };
   }, []);
 
-  // LOGIN ADMIN
+  // 🔥 មុខងារ LOGIN ជា ADMIN
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -387,6 +383,7 @@ export default function App() {
       triggerToast("ចូលប្រព័ន្ធ Admin ជោគជ័យ!");
     } catch (err) {
       console.error(err);
+      // Fallback សម្រាប់ការសាកល្បង
       if (adminEmail === "pengeangean@gmail.com" || adminEmail === "admin") {
         setCurrentUser({ role: "admin", name: userProfile.name });
         triggerToast("ចូលប្រព័ន្ធ Admin ជោគជ័យ!");
@@ -396,7 +393,7 @@ export default function App() {
     }
   };
 
-  // LOGIN STUDENT
+  // 🔥 មុខងារ LOGIN ជា សិស្ស (STUDENT)
   const handleStudentLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const queryStr = studentInputQuery.trim().toLowerCase();
@@ -405,6 +402,7 @@ export default function App() {
       return;
     }
 
+    // ស្វែងរកសិស្សក្នុងបញ្ជី
     const matched = students.find(s => 
       s.phoneNumber.includes(queryStr) || 
       s.telegram.toLowerCase().includes(queryStr) ||
@@ -425,19 +423,13 @@ export default function App() {
     }
   };
 
-  // LOGOUT (កែសម្រួលបន្ថែម async/await សម្រាប់ការចាកចេញរលូន)
-  const handleLogoutUser = async () => {
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error("Sign out error:", err);
-    }
+  // មុខងារ LOGOUT
+  const handleLogoutUser = () => {
+    signOut(auth);
     setCurrentUser(null);
     setAdminEmail("");
     setAdminPass("");
     setStudentInputQuery("");
-    setShowPassword(false);
-    setShowLogoutConfirmModal(false);
     triggerToast("បានចាកចេញពីប្រព័ន្ធ!");
   };
 
@@ -465,7 +457,7 @@ export default function App() {
     triggerToast("បានទាញយកតារាងគំរូ CSV រួចរាល់!");
   };
 
- // Upload CSV ដើម្បីធ្វើបច្ចុប្បន្នភាពព័ត៌មានសិស្ស (មិនបង្កើតថ្មី និងមិនជាន់ពីលើតម្លៃទទេ)
+  // Upload CSV ដើម្បីធ្វើបច្ចុប្បន្នភាពព័ត៌មានសិស្ស (មិនបង្កើតថ្មី និងមិនជាន់ពីលើតម្លៃទទេ)
   const handleCSVImportUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -580,6 +572,7 @@ export default function App() {
     reader.readAsText(file, "UTF-8");
     e.target.value = "";
   };
+
   // Bulk Delete
   const toggleSelectStudent = (id: string) => {
     setSelectedStudentIds(prev => 
@@ -804,7 +797,7 @@ export default function App() {
   const lateCount = dailyList.filter(s => s.status === "Late").length;
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
 
-  // ================= 🚪 SCREEN USER LOGIN VIEW =================
+  // ================= 🚪 SCREEN USER LOGIN VIEW (ប្រសិនបើមិនទាន់ LOG IN) =================
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#0f2b5c] flex items-center justify-center p-4 font-sans">
@@ -872,7 +865,7 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4 text-amber-400" />
                 <span>ចូលមើលវត្តមានផ្ទាល់ខ្លួន</span>
@@ -908,27 +901,19 @@ export default function App() {
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type="password"
                     required
                     placeholder="••••••••"
                     value={adminPass}
                     onChange={(e) => setAdminPass(e.target.value)}
-                    className="w-full pl-9 pr-10 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
+                    className="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:border-blue-600 font-mono"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(prev => !prev)}
-                    className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-                    title={showPassword ? "បិទលេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
                 </div>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-[#0f2b5c] hover:bg-blue-900 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4 text-emerald-400" />
                 <span>ចូលប្រព័ន្ធ Admin</span>
@@ -944,7 +929,7 @@ export default function App() {
     );
   }
 
-  // ================= 🎓 STUDENT PERSONAL PORTAL VIEW =================
+  // ================= 🎓 STUDENT PERSONAL PORTAL VIEW (ប្រសិនបើ LOG IN ជា សិស្ស) =================
   if (currentUser.role === "student") {
     const studentHistory = attendance.filter(r => r.studentId === currentUser.studentId);
     
@@ -957,6 +942,8 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
+        
+        {/* Toast */}
         <AnimatePresence>
           {toast && (
             <motion.div 
@@ -972,6 +959,8 @@ export default function App() {
         </AnimatePresence>
 
         <div className="max-w-4xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
+          
+          {/* Header Student View */}
           <header className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-[#0f2b5c] text-white font-black flex items-center justify-center text-lg shadow-sm">
@@ -984,14 +973,15 @@ export default function App() {
             </div>
 
             <button
-              onClick={() => setShowLogoutConfirmModal(true)}
-              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-red-200/80 shadow-2xs cursor-pointer"
+              onClick={handleLogoutUser}
+              className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
             >
               <LogOut className="w-4 h-4" />
               <span>ចាកចេញ</span>
             </button>
           </header>
 
+          {/* Student Welcome Card */}
           <div className="bg-gradient-to-r from-[#0f2b5c] to-blue-900 text-white p-6 rounded-3xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="space-y-1 text-center sm:text-left">
               <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block">ទំព័របង្ហាញវត្តមានផ្ទាល់ខ្លួន</span>
@@ -1005,6 +995,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* Personal Stats 5 Boxes */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
               <span className="text-2xl font-black text-emerald-600 block mb-1">{stPresent}</span>
@@ -1027,6 +1018,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* History Records Table */}
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
             <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
               <FileText className="w-5 h-5 text-blue-600" />
@@ -1079,59 +1071,13 @@ export default function App() {
               </table>
             </div>
           </div>
+
         </div>
 
-        {/* Modal បញ្ជាក់ការចាកចេញសម្រាប់សិស្ស */}
-        <AnimatePresence>
-          {showLogoutConfirmModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
-            >
-              <motion.div
-                initial={{ scale: 0.95, y: 15 }}
-                animate={{ scale: 1, y: 0 }}
-                exit={{ scale: 0.95, y: 15 }}
-                className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center space-y-4"
-              >
-                <div className="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-                  <LogOut className="w-7 h-7" />
-                </div>
-
-                <div className="space-y-1">
-                  <h3 className="text-base font-black text-slate-900">បញ្ជាក់ការចាកចេញ</h3>
-                  <p className="text-xs text-slate-500 font-semibold">
-                    តើអ្នកពិតជាចង់ចាកចេញពីប្រព័ន្ធមែនទេ?
-                  </p>
-                </div>
-
-                <div className="flex gap-2 pt-3 border-t">
-                  <button
-                    type="button"
-                    onClick={() => setShowLogoutConfirmModal(false)}
-                    className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                  >
-                    បោះបង់
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleLogoutUser}
-                    className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>យល់ព្រមចាកចេញ</span>
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
+        {/* Footer */}
         <footer className="mt-12 py-6 bg-white border-t border-slate-200/80 text-center text-slate-500 text-xs font-sans">
           <p className="font-bold text-slate-700 uppercase tracking-wider mb-1">
-            {userProfile.schoolName}
+            {userProfile.schoolName} - {userProfile.gradeClass}
           </p>
           <p className="text-slate-400 text-[11px]">
             Copyright © 2026. Student Attendance & Management System.
@@ -1144,6 +1090,8 @@ export default function App() {
   // ================= 🔑 ADMIN FULL MANAGEMENT PORTAL VIEW =================
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 font-sans flex flex-col justify-between">
+      
+      {/* Hidden File Input */}
       <input
         type="file"
         ref={fileInputRef}
@@ -1152,6 +1100,7 @@ export default function App() {
         className="hidden"
       />
 
+      {/* Toast Notification */}
       <AnimatePresence>
         {toast && (
           <motion.div 
@@ -1170,7 +1119,10 @@ export default function App() {
         
         {/* 🔝 TOP NAVIGATION BAR */}
         <header className="bg-white rounded-2xl p-2 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+          
           <nav className="flex space-x-1.5 w-full sm:w-auto overflow-x-auto">
+            
+            {/* 🎓 1. HOME TAB */}
             <button
               onClick={() => setActiveTab("home")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -1181,6 +1133,7 @@ export default function App() {
               <span>ទំព័រដើម</span>
             </button>
 
+            {/* 👤 2. ACCOUNT TAB */}
             <button
               onClick={() => setActiveTab("account")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -1191,6 +1144,7 @@ export default function App() {
               <span>គណនីខ្ញុំ</span>
             </button>
 
+            {/* 👨‍🎓 3. STUDENTS TAB */}
             <button
               onClick={() => setActiveTab("students")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -1201,6 +1155,7 @@ export default function App() {
               <span>គ្រប់គ្រងសិស្ស</span>
             </button>
 
+            {/* 📊 4. REPORTS TAB */}
             <button
               onClick={() => setActiveTab("reports")}
               className={`flex-1 sm:flex-none px-4 py-2.5 text-xs sm:text-sm font-extrabold rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 ${
@@ -1214,27 +1169,37 @@ export default function App() {
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <button
-              onClick={() => setShowLogoutConfirmModal(true)}
-              className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-red-200/80 shadow-2xs cursor-pointer"
+              onClick={() => setLang(lang === "km" ? "en" : "km")}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center gap-1"
             >
-              <LogOut className="w-4 h-4" />
+              <Globe className="w-3.5 h-3.5 text-slate-500" />
+              {lang === "km" ? "English" : "ភាសាខ្មែរ"}
+            </button>
+
+            <button
+              onClick={handleLogoutUser}
+              className="px-3 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+            >
+              <LogOut className="w-3.5 h-3.5" />
               <span>ចាកចេញ</span>
             </button>
           </div>
         </header>
 
-        {/* ================= 🎓 1. HOME TAB (ទំព័រដើម) ================= */}
+        {/* ================= 🎓 1. HOME TAB ================= */}
         {activeTab === "home" && (
           <div className="space-y-6">
+            
+            {/* Welcome Banner */}
             <div className="bg-gradient-to-r from-[#0f2b5c] via-blue-900 to-slate-900 text-white p-6 rounded-3xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="space-y-2 text-center md:text-left">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-amber-300 backdrop-blur-xs">
                   <GraduationCap className="w-4 h-4" />
-                  <span>ប្រព័ន្ធគ្រប់គ្រងវត្តមានគរុនិស្សិត R01</span>
+                  <span>ប្រព័ន្ធគ្រប់គ្រងសាលារៀន និងវត្តមានសិស្ស</span>
                 </div>
                 <h2 className="text-xl md:text-2xl font-black">{userProfile.schoolName}</h2>
                 <p className="text-xs text-blue-200">
-                  អ្នកគ្រប់គ្រងវត្តមាន៖ <strong>{userProfile.name}</strong> • ប្រធានថ្នាក់ <strong>{userProfile.gradeClass}</strong>
+                  លោកគ្រូ៖ <strong>{userProfile.name}</strong> • ទទួលបន្ទុក៖ <strong>{userProfile.gradeClass}</strong>
                 </p>
               </div>
 
@@ -1247,12 +1212,12 @@ export default function App() {
               </button>
             </div>
 
-            {/* Dashboard វត្តមាន */}
+            {/* Dashboard វត្តមានសិស្ស */}
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-[#0f2b5c]">
                   <CheckCircle className="w-5 h-5 text-[#0f2b5c]" />
-                  <h2 className="text-lg font-extrabold tracking-tight">វត្តមាន (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
+                  <h2 className="text-lg font-extrabold tracking-tight">វត្តមានសិស្ស (បង្ហាញ {filteredList.length} / {totalCount} នាក់)</h2>
                 </div>
                 <span className="text-xs bg-blue-50 text-blue-800 font-bold px-3 py-1 rounded-full border border-blue-200">
                   {shift === "morning" ? "វេនព្រឹក" : "វេនរសៀល"}
@@ -1336,17 +1301,36 @@ export default function App() {
                     className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs space-y-3 hover:shadow-md transition-all flex flex-col justify-between"
                   >
                     <div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
-                          {i + 1}
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#0f2b5c] text-white font-black flex items-center justify-center text-sm shrink-0">
+                            {i + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
+                              {st.name}
+                            </h4>
+                            <p className="text-xs text-slate-400 font-mono truncate">
+                              {st.telegram || st.phoneNumber || `student_${i + 1}`}
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-extrabold text-slate-900 text-base leading-snug truncate">
-                            {st.name}
-                          </h4>
-                          <p className="text-xs text-slate-400 font-mono truncate">
-                            {st.telegram || st.phoneNumber || `student_${i + 1}`}
-                          </p>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleEditInit(st)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="កែប្រែ"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStudent(st.id, st.name)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="លុប"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
 
@@ -1448,17 +1432,20 @@ export default function App() {
                           </motion.div>
                         )}
                       </AnimatePresence>
+
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+
           </div>
         )}
 
         {/* ================= 👤 2. ACCOUNT TAB ================= */}
         {activeTab === "account" && (
           <div className="space-y-6">
+            
             <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
               <h2 className="text-lg font-black text-[#0f2b5c] flex items-center gap-2">
                 <User className="w-5 h-5 text-[#0f2b5c]" />
@@ -1478,11 +1465,13 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
               <div className="lg:col-span-4 bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs text-center space-y-5 flex flex-col justify-between">
                 <div className="space-y-4">
+                  
                   <div className="relative w-36 h-36 mx-auto">
                     <img
-                      src={userProfile.profilePhoto || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTDTgxGtJAQIkIgetyLzTEIeu1EHSwZvTJpMNQiNzjpt6Ve_vKnTY7CKqs&s=10"}
+                      src={userProfile.profilePhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80"}
                       alt={userProfile.name}
                       className="w-full h-full object-cover rounded-full border-4 border-slate-100 shadow-md mx-auto"
                     />
@@ -1537,9 +1526,11 @@ export default function App() {
                     </a>
                   </div>
                 </div>
+
               </div>
 
               <div className="lg:col-span-8 space-y-6">
+                
                 <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-4">
                   <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 border-b pb-3">
                     <Phone className="w-4 h-4 text-blue-600" />
@@ -1553,7 +1544,7 @@ export default function App() {
                     </div>
 
                     <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                      <span className="text-slate-400 block text-[11px]">សញ្ជាតិ | ជនជាតិ</span>
+                      <span className="text-slate-400 block text-[11px]">សញ្ជាតិ | អម្បូរ</span>
                       <strong className="text-slate-900 block">{userProfile.nationality}</strong>
                     </div>
 
@@ -1637,8 +1628,11 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
               </div>
+
             </div>
+
           </div>
         )}
 
@@ -1714,7 +1708,7 @@ export default function App() {
                   >
                     <div>
                       <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex items-center gap-3">
                           <button
                             type="button"
                             onClick={() => toggleSelectStudent(st.id)}
@@ -1736,45 +1730,83 @@ export default function App() {
                               {st.name}
                             </h4>
                             <p className="text-xs text-slate-400 font-mono truncate">
-                              {st.telegram ? `@${st.telegram.replace(/^@/, '')}` : (st.phoneNumber || `student_${i + 1}`)}
+                              {st.telegram || st.phoneNumber || `student_${i + 1}`}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleEditInit(st)}
                             className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="កែប្រែ"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteStudent(st.id, st.name)}
                             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="លុប"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
 
-                      <div className="mt-3 pt-3 border-t border-slate-100 text-xs space-y-1.5 text-slate-600">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">ភេទ / ថ្ងៃកំណើត៖</span>
-                          <span className="font-semibold text-slate-800">{st.gender} • {st.dob || "-"}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">លេខទូរស័ព្ទ៖</span>
-                          <span className="font-mono font-semibold text-slate-800">{st.phoneNumber || "-"}</span>
-                        </div>
-                        {st.address && (
-                          <div className="flex justify-between">
-                            <span className="text-slate-400">អាសយដ្ឋាន៖</span>
-                            <span className="font-semibold text-slate-800 truncate max-w-[180px]">{st.address}</span>
-                          </div>
-                        )}
+                      <div className="grid grid-cols-4 gap-1.5 pt-3 mt-3 border-t border-slate-100 bg-[#f8fafc] p-1.5 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Present")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Present"
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : "text-emerald-700 hover:bg-emerald-50"
+                          }`}
+                        >
+                          <Check className="w-4 h-4 mb-0.5" />
+                          <span>វត្តមាន</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Absent")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Absent" || st.status === "Absent_No_Permission"
+                              ? "bg-red-600 text-white shadow-xs"
+                              : "text-red-700 hover:bg-red-50"
+                          }`}
+                        >
+                          <X className="w-4 h-4 mb-0.5" />
+                          <span>អវត្តមាន</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Late")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Late"
+                              ? "bg-amber-500 text-white shadow-xs"
+                              : "text-amber-700 hover:bg-amber-50"
+                          }`}
+                        >
+                          <Clock className="w-4 h-4 mb-0.5" />
+                          <span>យឺត</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateAttendanceStatus(st.id, "Permission")}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-[11px] font-bold transition-all ${
+                            st.status === "Permission" || st.status === "Absent_Permission"
+                              ? "bg-blue-600 text-white shadow-xs"
+                              : "text-blue-700 hover:bg-blue-50"
+                          }`}
+                        >
+                          <Calendar className="w-4 h-4 mb-0.5" />
+                          <span>ច្បាប់</span>
+                        </button>
                       </div>
+
                     </div>
                   </div>
                 );
@@ -1786,6 +1818,7 @@ export default function App() {
         {/* ================= 📊 4. TAB: របាយការណ៍ ================= */}
         {activeTab === "reports" && (
           <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
+            
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
               <div>
                 <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -1863,58 +1896,11 @@ export default function App() {
                 </tbody>
               </table>
             </div>
+
           </div>
         )}
 
       </div>
-
-      {/* MODAL បញ្ជាក់ការចាកចេញសម្រាប់ ADMIN */}
-      <AnimatePresence>
-        {showLogoutConfirmModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 overflow-y-auto"
-          >
-            <motion.div
-              initial={{ scale: 0.95, y: 15 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.95, y: 15 }}
-              className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl relative text-center space-y-4"
-            >
-              <div className="w-14 h-14 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
-                <LogOut className="w-7 h-7" />
-              </div>
-
-              <div className="space-y-1">
-                <h3 className="text-base font-black text-slate-900">បញ្ជាក់ការចាកចេញ</h3>
-                <p className="text-xs text-slate-500 font-semibold">
-                  តើអ្នកពិតជាចង់ចាកចេញពីប្រព័ន្ធមែនទេ?
-                </p>
-              </div>
-
-              <div className="flex gap-2 pt-3 border-t">
-                <button
-                  type="button"
-                  onClick={() => setShowLogoutConfirmModal(false)}
-                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                >
-                  បោះបង់
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLogoutUser}
-                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span>យល់ព្រមចាកចេញ</span>
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* MODAL នាំចូល CSV/EXCEL */}
       <AnimatePresence>
