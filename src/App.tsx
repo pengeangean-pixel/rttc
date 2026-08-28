@@ -478,7 +478,28 @@ export default function App() {
     return result;
   };
 
-  // Upload CSV ដើម្បីធ្វើបច្ចុប្បន្នភាពព័ត៌មានសិស្ស (Update Only & Smart Matching)
+ // មុខងារ Parse CSV Row
+  const parseCSVRow = (rowStr: string): string[] => {
+    const result: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < rowStr.length; i++) {
+      const char = rowStr[i];
+      if (char === '"' || char === "'") {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim().replace(/^["']|["']$/g, ""));
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim().replace(/^["']|["']$/g, ""));
+    return result;
+  };
+
+  // Upload & Update CSV
   const handleCSVImportUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -494,16 +515,15 @@ export default function App() {
           return;
         }
 
-        // ១. ចាប់យក Header Indexes ដោយស្វ័យប្រវត្តិ
+        // ១. ចាប់យក Header ដោយស្វ័យប្រវត្តិ មិនបារម្ភរឿងមាន ឬគ្មាន Timestamp
         const headers = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase());
-        
         const getColIndex = (keywords: string[]) => {
           return headers.findIndex(h => keywords.some(k => h.includes(k.toLowerCase())));
         };
 
         const idxId = getColIndex(["id", "កូដ"]);
         const idxName = getColIndex(["ឈ្មោះ", "name"]);
-        const idxGender = getColIndex(["ភេទ", "gender", "sex"]);
+        const idxGender = getColIndex(["ភេទ", "gender"]);
         const idxDob = getColIndex(["ថ្ងៃកំណើត", "កំណើត", "dob", "birth"]);
         const idxPhone = getColIndex(["ទូរស័ព្ទ", "phone", "tel"]);
         const idxTelegram = getColIndex(["telegram", "តេឡេក្រាម"]);
@@ -518,7 +538,9 @@ export default function App() {
         const updatedStudentsList: Student[] = [];
         const batch = writeBatch(db);
 
-        // ២. ដំណើរការអាន និង Update ជួរដេកនីមួយៗ
+        const cleanStr = (str: string) => (str || "").replace(/\s+/g, "").toLowerCase();
+
+        // ២. អានជួរទិន្នន័យនីមួយៗ
         for (let i = 1; i < lines.length; i++) {
           const row = parseCSVRow(lines[i]);
           if (!row || row.length === 0) continue;
@@ -527,7 +549,7 @@ export default function App() {
           const rawId = idxId !== -1 ? row[idxId]?.trim() : "";
           let rawPhone = idxPhone !== -1 ? row[idxPhone]?.trim().replace(/\s+/g, "") : "";
 
-          // បន្ថែមលេខ 0 ខាងមុខលេខទូរស័ព្ទ ប្រសិនបើ Excel កាត់ចោល (ឧ. 976628767 -> 0976628767)
+          // បន្ថែមលេខ 0 ខាងមុខលេខទូរស័ព្ទ ប្រសិនបើ Excel កាត់ចោល
           if (rawPhone && rawPhone.length === 8 && !rawPhone.startsWith("0")) {
             rawPhone = "0" + rawPhone;
           } else if (rawPhone && rawPhone.length === 9 && !rawPhone.startsWith("0")) {
@@ -536,64 +558,40 @@ export default function App() {
 
           if (!rawName && !rawPhone && !rawId) continue;
 
-          // ៣. ស្វែងរកសិស្សដែលមានស្រាប់ក្នុងប្រព័ន្ធ (តាម ID, លេខទូរស័ព្ទ ឬ ឈ្មោះ)
-          const clean = (s: string) => s.replace(/\s+/g, "").toLowerCase();
-
+          // ៣. ស្វែងរកសិស្សក្នុងប្រព័ន្ធតាម ឈ្មោះ, លេខទូរស័ព្ទ ឬ ID
           const existingStudent = students.find(s => 
             (rawId && s.id === rawId) ||
-            (rawPhone && s.phoneNumber && clean(s.phoneNumber) === clean(rawPhone)) ||
-            (rawName && s.name && clean(s.name) === clean(rawName))
+            (rawName && s.name && cleanStr(s.name) === cleanStr(rawName)) ||
+            (rawPhone && s.phoneNumber && cleanStr(s.phoneNumber) === cleanStr(rawPhone))
           );
 
-          // ប្រសិនបើគ្មានសិស្សនេះក្នុងប្រព័ន្ធ គឺរំលងចោល (មិនបញ្ចូលថ្មី)
           if (!existingStudent) {
             skippedCount++;
             continue;
           }
 
-          // ៤. ធ្វើបច្ចុប្បន្នភាពតែចំពោះទិន្នន័យណាដែលមានតម្លៃ (មិនទទេ)
+          // ៤. ធ្វើបច្ចុប្បន្នភាពទិន្នន័យ (រួមទាំងថ្ងៃខែឆ្នាំកំណើត dob)
           const updatedData: Partial<Student> = { ...existingStudent };
 
           if (rawName) updatedData.name = rawName;
           
+          if (idxDob !== -1 && row[idxDob]?.trim()) {
+            updatedData.dob = row[idxDob].trim();
+          }
+
           if (idxGender !== -1 && row[idxGender]) {
             const g = row[idxGender].trim();
             updatedData.gender = (g === "ស្រី" || g.toLowerCase() === "female" || g.toLowerCase() === "f") ? "ស្រី" : "ប្រុស";
           }
-          
-          if (idxDob !== -1 && row[idxDob]?.trim()) {
-            updatedData.dob = row[idxDob].trim();
-          }
-          
-          if (rawPhone) {
-            updatedData.phoneNumber = rawPhone;
-          }
-          
-          if (idxTelegram !== -1 && row[idxTelegram]?.trim()) {
-            updatedData.telegram = row[idxTelegram].trim();
-          }
-          
-          if (idxSchool !== -1 && row[idxSchool]?.trim()) {
-            updatedData.schoolName = row[idxSchool].trim();
-          }
-          
-          if (idxVillage !== -1 && row[idxVillage]?.trim()) {
-            updatedData.village = row[idxVillage].trim();
-          }
-          
-          if (idxCommune !== -1 && row[idxCommune]?.trim()) {
-            updatedData.commune = row[idxCommune].trim();
-          }
-          
-          if (idxDistrict !== -1 && row[idxDistrict]?.trim()) {
-            updatedData.district = row[idxDistrict].trim();
-          }
-          
-          if (idxProvince !== -1 && row[idxProvince]?.trim()) {
-            updatedData.province = row[idxProvince].trim();
-          }
 
-          // ផ្សំអាសយដ្ឋានពេញលេញ ប្រសិនបើមានទិន្នន័យភូមិ/ឃុំ/ស្រុក/ខេត្ត
+          if (rawPhone) updatedData.phoneNumber = rawPhone;
+          if (idxTelegram !== -1 && row[idxTelegram]?.trim()) updatedData.telegram = row[idxTelegram].trim();
+          if (idxSchool !== -1 && row[idxSchool]?.trim()) updatedData.schoolName = row[idxSchool].trim();
+          if (idxVillage !== -1 && row[idxVillage]?.trim()) updatedData.village = row[idxVillage].trim();
+          if (idxCommune !== -1 && row[idxCommune]?.trim()) updatedData.commune = row[idxCommune].trim();
+          if (idxDistrict !== -1 && row[idxDistrict]?.trim()) updatedData.district = row[idxDistrict].trim();
+          if (idxProvince !== -1 && row[idxProvince]?.trim()) updatedData.province = row[idxProvince].trim();
+
           const v = updatedData.village || "";
           const c = updatedData.commune || "";
           const d = updatedData.district || "";
@@ -602,11 +600,10 @@ export default function App() {
             updatedData.address = [v, c, d, p].filter(Boolean).join(", ");
           }
 
-          // បញ្ចូលក្នុង Firestore Batch
           batch.set(
             doc(db, "students", existingStudent.id), 
             removeUndefinedFields(updatedData), 
-            { merge: true } // រក្សារូបថត Profile ឬទិន្នន័យចាស់ដែលមិនត្រូវបានកែ
+            { merge: true }
           );
 
           updatedStudentsList.push(updatedData as Student);
@@ -614,14 +611,12 @@ export default function App() {
         }
 
         if (updatedCount === 0) {
-          triggerToast("⚠️ មិនមានទិន្នន័យសិស្សណាត្រូវ Update ឡើយ (រកមិនឃើញឈ្មោះ ឬលេខទូរស័ព្ទក្នុងប្រព័ន្ធ)!");
+          triggerToast("⚠️ មិនមានទិន្នន័យសិស្សណាត្រូវបាន Update ឡើយ (រកមិនឃើញឈ្មោះក្នុងប្រព័ន្ធ)!");
           return;
         }
 
-        // រុញទិន្នន័យទាំងអស់ទៅ Firestore
         await batch.commit();
 
-        // ធ្វើបច្ចុប្បន្នភាព State UI
         setStudents(prev => {
           const merged = [...prev];
           updatedStudentsList.forEach(upSt => {
@@ -632,7 +627,7 @@ export default function App() {
         });
 
         setShowCSVModal(false);
-        triggerToast(`ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាពសិស្សចំនួន ${updatedCount} នាក់ (រំលងឈ្មោះដែលមិនមាន ${skippedCount} នាក់)`);
+        triggerToast(`ជោគជ័យ! បានធ្វើបច្ចុប្បន្នភាពសិស្សចំនួន ${updatedCount} នាក់ (រំលងឈ្មោះមិនមាន ${skippedCount} នាក់)`);
       } catch (err) {
         console.error("Error updating CSV:", err);
         triggerToast("មានបញ្ហាក្នុងការអាន ឬកត់ត្រាឯកសារ CSV");
