@@ -825,8 +825,13 @@ export default function App() {
     s.telegram.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // 🔥 គណនាស្ថិតិ Dashboard
   const totalCount = students.length;
+  const femaleCount = students.filter(s => s.gender === "ស្រី" || s.gender?.toLowerCase() === "female").length;
+
   const presentCount = dailyList.filter(s => s.status === "Present").length;
+  const femalePresentCount = dailyList.filter(s => (s.gender === "ស្រី" || s.gender?.toLowerCase() === "female") && s.status === "Present").length;
+
   const absentCount = dailyList.filter(s => s.status === "Absent" || s.status === "Absent_No_Permission").length;
   const lateCount = dailyList.filter(s => s.status === "Late").length;
   const permissionCount = dailyList.filter(s => s.status === "Permission" || s.status === "Absent_Permission").length;
@@ -1007,7 +1012,6 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              {/* 🌟 ប៊ូតុងស្នើសុំច្បាប់ (Leave Request Link Button) */}
               <a
                 href="https://tinyurl.com/4bp6dxbn"
                 target="_blank"
@@ -1325,15 +1329,23 @@ export default function App() {
                 </div>
               </div>
 
-              {/* របារបង្ហាញស្ថិតិ ៥ ប្រអប់ */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {/* របារបង្ហាញស្ថិតិ ៦ ប្រអប់ (រួមបញ្ចូលទាំងចំនួនសិស្សស្រី) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
                   <span className="text-2xl font-black text-[#0f2b5c] block mb-1">{totalCount}</span>
                   <span className="text-xs font-bold text-slate-500">សរុប</span>
                 </div>
 
+                <div className="bg-white border border-pink-200/80 rounded-2xl p-4 text-center shadow-2xs bg-pink-50/20">
+                  <span className="text-2xl font-black text-pink-600 block mb-1">{femaleCount}</span>
+                  <span className="text-xs font-bold text-pink-700">ស្រី</span>
+                </div>
+
                 <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
-                  <span className="text-2xl font-black text-emerald-600 block mb-1">{presentCount}</span>
+                  <span className="text-2xl font-black text-emerald-600 block mb-1">
+                    {presentCount}
+                    <span className="text-[11px] font-bold text-slate-400 font-normal ml-1">(ស្រី {femalePresentCount})</span>
+                  </span>
                   <span className="text-xs font-bold text-slate-500">វត្តមាន</span>
                 </div>
 
@@ -1347,7 +1359,7 @@ export default function App() {
                   <span className="text-xs font-bold text-slate-500">យឺត</span>
                 </div>
 
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs col-span-2 sm:col-span-1">
+                <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
                   <span className="text-2xl font-black text-blue-600 block mb-1">{permissionCount}</span>
                   <span className="text-xs font-bold text-slate-500">ច្បាប់</span>
                 </div>
