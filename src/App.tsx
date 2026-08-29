@@ -50,7 +50,9 @@ import {
   Upload, 
   CheckSquare, 
   Square, 
-  LogIn 
+  LogIn,
+  ExternalLink,
+  Send
 } from "lucide-react";
 import { Student, AttendanceRecord, AttendanceStatus, AttendanceShift, UserProfile, CurrentUser } from "./types";
 import QRCode from "qrcode";
@@ -379,7 +381,6 @@ export default function App() {
       triggerToast("ចូលប្រព័ន្ធ Admin ជោគជ័យ!");
     } catch (err) {
       console.error(err);
-      // Fallback សម្រាប់ការសាកល្បង
       if (adminEmail === "pengeangean@gmail.com" || adminEmail === "admin") {
         setCurrentUser({ role: "admin", name: userProfile.name });
         triggerToast("ចូលប្រព័ន្ធ Admin ជោគជ័យ!");
@@ -489,7 +490,6 @@ export default function App() {
           return;
         }
 
-        // ១. ចាប់យក Header ដោយស្វ័យប្រវត្តិ មិនបារម្ភរឿងមាន ឬគ្មាន Timestamp
         const headers = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase());
         const getColIndex = (keywords: string[]) => {
           return headers.findIndex(h => keywords.some(k => h.includes(k.toLowerCase())));
@@ -514,7 +514,6 @@ export default function App() {
 
         const cleanStr = (str: string) => (str || "").replace(/\s+/g, "").toLowerCase();
 
-        // ២. អានជួរទិន្នន័យនីមួយៗ
         for (let i = 1; i < lines.length; i++) {
           const row = parseCSVRow(lines[i]);
           if (!row || row.length === 0) continue;
@@ -523,7 +522,6 @@ export default function App() {
           const rawId = idxId !== -1 ? row[idxId]?.trim() : "";
           let rawPhone = idxPhone !== -1 ? row[idxPhone]?.trim().replace(/\s+/g, "") : "";
 
-          // បន្ថែមលេខ 0 ខាងមុខលេខទូរស័ព្ទ ប្រសិនបើ Excel កាត់ចោល
           if (rawPhone && rawPhone.length === 8 && !rawPhone.startsWith("0")) {
             rawPhone = "0" + rawPhone;
           } else if (rawPhone && rawPhone.length === 9 && !rawPhone.startsWith("0")) {
@@ -532,7 +530,6 @@ export default function App() {
 
           if (!rawName && !rawPhone && !rawId) continue;
 
-          // ៣. ស្វែងរកសិស្សក្នុងប្រព័ន្ធតាម ឈ្មោះ, លេខទូរស័ព្ទ ឬ ID
           const existingStudent = students.find(s => 
             (rawId && s.id === rawId) ||
             (rawName && s.name && cleanStr(s.name) === cleanStr(rawName)) ||
@@ -544,7 +541,6 @@ export default function App() {
             continue;
           }
 
-          // ៤. ធ្វើបច្ចុប្បន្នភាពទិន្នន័យ (រួមទាំងថ្ងៃខែឆ្នាំកំណើត dob)
           const updatedData: Partial<Student> = { ...existingStudent };
 
           if (rawName) updatedData.name = rawName;
@@ -999,9 +995,9 @@ export default function App() {
         <div className="max-w-4xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
           
           {/* Header Student View */}
-          <header className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#0f2b5c] text-white font-black flex items-center justify-center text-lg shadow-sm">
+          <header className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="w-12 h-12 rounded-2xl bg-[#0f2b5c] text-white font-black flex items-center justify-center text-lg shadow-sm shrink-0">
                 🎓
               </div>
               <div>
@@ -1010,13 +1006,27 @@ export default function App() {
               </div>
             </div>
 
-            <button
-              onClick={handleLogoutUser}
-              className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>ចាកចេញ</span>
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              {/* 🌟 ប៊ូតុងស្នើសុំច្បាប់ (Leave Request Link Button) */}
+              <a
+                href="https://tinyurl.com/4bp6dxbn"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-sm hover:shadow"
+              >
+                <Send className="w-3.5 h-3.5 text-slate-900" />
+                <span>ស្នើសុំច្បាប់</span>
+                <ExternalLink className="w-3 h-3 text-slate-700" />
+              </a>
+
+              <button
+                onClick={handleLogoutUser}
+                className="px-3.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>ចាកចេញ</span>
+              </button>
+            </div>
           </header>
 
           {/* Student Welcome Card */}
@@ -1033,7 +1043,31 @@ export default function App() {
             </div>
           </div>
 
-          {/* Personal Stats 5 Boxes */}
+          {/* Quick Leave Request Banner Card */}
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-3xl p-5 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 text-center sm:text-left">
+              <div className="w-12 h-12 rounded-2xl bg-amber-400/20 text-amber-800 flex items-center justify-center shrink-0">
+                <Calendar className="w-6 h-6 text-amber-700" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-900">ត្រូវការច្បាប់ឈប់សម្រាកមែនទេ?</h4>
+                <p className="text-xs text-slate-500 mt-0.5">ចុចទីនេះដើម្បីបំពេញទម្រង់បែបបទស្នើសុំច្បាប់ទៅកាន់លោកគ្រូ</p>
+              </div>
+            </div>
+
+            <a
+              href="https://tinyurl.com/4bp6dxbn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-5 py-2.5 bg-[#0f2b5c] hover:bg-blue-950 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 shrink-0"
+            >
+              <Send className="w-3.5 h-3.5 text-amber-400" />
+              <span>បំពេញពាក្យសុំច្បាប់</span>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-300" />
+            </a>
+          </div>
+
+          {/* Personal Stats 4 Boxes */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white border border-slate-200/80 rounded-2xl p-4 text-center shadow-2xs">
               <span className="text-2xl font-black text-emerald-600 block mb-1">{stPresent}</span>
